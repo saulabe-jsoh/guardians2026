@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stalking AI Research Lab</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- React & React DOM CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  
+  <!-- Babel Standalone (브라우저에서 JSX 변환) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-[#070913]">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // Lucide Icon Helper (Lucide CDN을 React 컴포넌트로 래핑)
+    const LucideIcon = ({ name, className = "w-4 h-4", ...props }) => {
+      const ref = React.useRef(null);
+      useEffect(() => {
+        if (ref.current && window.lucide) {
+          ref.current.innerHTML = `<i data-lucide="${name}" class="${className}"></i>`;
+          window.lucide.createIcons({
+            attrs: { class: className },
+            nameAttr: 'data-lucide'
+          });
+        }
+      }, [name, className]);
+      return <span ref={ref} className="inline-flex items-center justify-center" {...props} />;
+    };
+
+    // 아이콘 래퍼 정의
+    const Shield = (p) => <LucideIcon name="shield" {...p} />;
+    const Layers = (p) => <LucideIcon name="layers" {...p} />;
+    const FileText = (p) => <LucideIcon name="file-text" {...p} />;
+    const Activity = (p) => <LucideIcon name="activity" {...p} />;
+    const ArrowRight = (p) => <LucideIcon name="arrow-right" {...p} />;
+    const Cpu = (p) => <LucideIcon name="cpu" {...p} />;
+    const Database = (p) => <LucideIcon name="database" {...p} />;
+    const Play = (p) => <LucideIcon name="play" {...p} />;
+    const Copy = (p) => <LucideIcon name="copy" {...p} />;
+    const ChevronLeft = (p) => <LucideIcon name="chevron-left" {...p} />;
+    const ChevronRight = (p) => <LucideIcon name="chevron-right" {...p} />;
+    const BookOpen = (p) => <LucideIcon name="book-open" {...p} />;
+    const Clock = (p) => <LucideIcon name="clock" {...p} />;
+    const Award = (p) => <LucideIcon name="award" {...p} />;
+    const Zap = (p) => <LucideIcon name="zap" {...p} />;
+    const Check = (p) => <LucideIcon name="check" {...p} />;
+    const RefreshCw = (p) => <LucideIcon name="refresh-cw" {...p} />;
+    const AlertTriangle = (p) => <LucideIcon name="alert-triangle" {...p} />;
+    const MapPin = (p) => <LucideIcon name="map-pin" {...p} />;
+
+    // K-SAS V-Factor Items (Victim Vulnerability)
+    const KSAS_V_ITEMS = [
+      {
+        id: "V1",
+        title: "신변 안전에 대한 우려",
+        desc: "가해자의 직접적 위해 혹은 스토킹 지속에 기인하는 실질적 신변 공포",
+        weights: [
+          { score: 0, label: "없음 (0점)" },
+          { score: 1, label: "보통/경미 (1점)" },
+          { score: 2, label: "극심/지속 (2점)" }
+        ]
+      },
+      {
+        id: "V2",
+        title: "가족/지인 안전 우려",
+        desc: "피해자 외 주변인(가족, 자녀, 동거인)에 대한 공격 및 위해 두려움",
+        weights: [
+          { score: 0, label: "없음 (0점)" },
+          { score: 1, label: "보통/경미 (1점)" },
+          { score: 2, label: "극심/지속 (2점)" }
+        ]
+      },
+      {
+        id: "V3",
+        title: "비일관적 진술/태도",
+        desc: "가해자와의 양가적 관계 또는 보복 공포로 고소 및 합의/처벌불원을 번복하는 행위",
+        weights: [
+          { score: 0, label: "일관됨 (0점)" },
+          { score: 1, label: "일부 번복 (1점)" },
+          { score: 2, label: "잦은 번복 (2점)" }
+        ]
+      },
+      {
+        id: "V4",
+        title: "보호서비스 인지 결함",
+        desc: "지적 장애, 정신 질환, 사회적 차단 등으로 사법/보호 서비스를 활용하지 못함",
+        weights: [
+          { score: 0, label: "해당없음 (0점)" },
+          { score: 1, label: "인지 저하 (1점)" },
+          { score: 2, label: "중증 제약 (2점)" }
+        ]
+      },
+      {
+        id: "V5",
+        title: "주거 환경의 불안정성",
+        desc: "가해자가 주거지/직장 위치를 파악하고 있으며, 도어락 파손이나 보안 시스템 부재 상태",
+        weights: [
+          { score: 0, label: "보안안전 (0점)" },
+          { score: 1, label: "일부 노출 (1점)" },
+          { score: 2, label: "완전 취약 (2점)" }
+        ]
+      },
+      {
+        id: "V6",
+        title: "재정적 기회 결함",
+        desc: "생활비를 가해자에게 의존하거나 재정적 자립도가 최악인 무자력 상태 (위험 가속 주 요인)",
+        weights: [
+          { score: 0, label: "자립가능 (0점)" },
+          { score: 1, label: "일부 의존 (1점)" },
+          { score: 2, label: "완전 무자력 (2점)" }
+        ]
+      },
+      {
+        id: "V7",
+        title: "보호조치 사법적 무시",
+        desc: "서면경고, 긴급응급조치, 잠정조치 등이 효력이 없고 가해자가 이를 위반하거나 비웃음",
+        weights: [
+          { score: 0, label: "정상이행 (0점)" },
+          { score: 1, label: "경미 위반 (1점)" },
+          { score: 2, label: "지속 위반 (2점)" }
+        ]
+      }
+    ];
+
+    // K-SAS C-Factor Items (Criminal Offense Features)
+    const KSAS_C_ITEMS = [
+      { id: 'C1', title: '배회 및 반복 연락', desc: '특정 지점 매복, 수백 회의 메시지 및 수화기 발신 테러' },
+      { id: 'C2', title: '물리적 손괴/침입', desc: '주거지 배관 침입 시도, 도어락 비밀번호 강제 해제 시도' },
+      { id: 'C3', title: '흉기 소지 및 위협', desc: '면도칼, 과도 등 위해 도구를 은닉 또는 대놓고 가해 의사 피력' },
+      { id: 'C4', title: '디지털 계정 우회 추적', desc: '가상 번호, 타인 명의 부계정을 통한 차단 무력화 스토킹' }
+    ];
+
+    // K-SAS P-Factor Items (Perpetrator Risk Factors)
+    const KSAS_P_ITEMS = [
+      { id: 'P1', title: '동종 강력 전과 이력', desc: '폭행, 상해, 과거 타인에 대한 스토킹 고소 유죄 이력' },
+      { id: 'P2', title: '조현/망상 및 심리 이상', desc: '가해자의 망상장애, 치료 거부, 현실 왜곡 등 중증 심리 정황' },
+      { id: 'P3', title: '처벌 공포 상실 (자살 암시)', desc: '"같이 죽자", "감방 가도 상관없다" 등 사회 규범 마비 상태' },
+      { id: 'P4', title: '중독성 물질 남용 상태', desc: '음주 시 인지 왜곡 극대화, 약물 의존성 정황 감지' }
+    ];
+
+    const PRESENTATION_SLIDES = [
+      {
+        title: "1. 연구 과제 제안 배경",
+        subtitle: "스토킹 범죄의 치명적 전이 극복을 위한 치안 혁신",
+        bullets: [
+          "스토킹은 단순 괴롭힘이 아니며 살인, 중상해 등 보복성 강력범죄로 진화하는 대표적인 시간 의존적 범죄",
+          "이수정 외 연구진(2023)의 K-SAS(한국판 스토킹 위험성 평가 도구)는 뛰어난 변별력을 지녔으나, 치안 현장의 데이터 인프라 부재로 수동 평가에 한계 노출",
+          "실제 112 신고 데이터는 강력한 개인정보 보호법에 의해 외부 반출 및 대규모 AI 학습 원천 배제",
+          "해결책: 통계청 및 수사 백서를 근거로 치안 문서를 합성(Synthesis)하고 이를 LLM에 파인튜닝하는 새로운 연구 파이프라인 구안"
+        ],
+        highlight: "핵심 이점: 원본 개인정보 유출 리스크 제로(0) 기반의 초정밀 실감 치안 AI 구현"
+      },
+      {
+        title: "2. 합성 데이터셋 파인튜닝 메커니즘",
+        subtitle: "정형 다차원 통계에서 비정형 자연어 보고서로의 진화",
+        bullets: [
+          "K-SAS의 심리·정성 지표(V요인)를 다차원 행렬 구조로 설계하고, CTGAN을 통해 통계적 결합 분포를 유지한 가상 정형 데이터 1,000건 모델링",
+          "속성 정형 값을 LLM 프롬프트 템플릿으로 구조화하여, 각 레벨별 '112 실시간 신고', '경찰 수사초기보고서', '수사 종결보고서' 3대 수사 텍스트 서사로 변환",
+          "오픈소스 Ko-LLM(Llama-3 계열 등)에 위 가상 수사 서사 자료를 파인튜닝(SFT/LoRA)하여 정형 지표에 상응하는 고신뢰 치안 텍스트 자동 생성 파이프라인 완성"
+        ],
+        highlight: "학습 혁신: 속성 매트릭스 입력 ➡️ AI 서사 문서 합성 ➡️ K-SAS 예측 알고리즘 정렬"
+      },
+      {
+        title: "3. 다차원 고위험 결합 예측 모델",
+        subtitle: "K-SAS 지표 정량화와 시계열 가속도 변수 결합",
+        bullets: [
+          "V요인 상관계수 가산화: K-SAS 검증 논문(김현우·이수정, 2023)에 따라 특히 V6(재정적 무자력), V7(사법보호 위반)에 강력한 고위험 패널티 부여",
+          "신고 주기 압축 가속도(ΔT): 신고 간격이 수개월에서 수일/수시간으로 좁혀지는 패턴을 지수 가중치로 치환해 에스컬레이션 즉각 분별",
+          "실시간 음성 환경 변수 보정: 상황실 접수 요원이 청취하는 피해자 음주 여부(취약성 고도화) 및 수화기 너머 가해자 음향(대치 위급성) 실시간 가산"
+        ],
+        highlight: "위험 판단 정확성: 논문 검증 수치(AUC=0.653, 7점 임계치)를 뛰어넘는 가중치 기반 실전 모형 확보"
+      },
+      {
+        title: "4. 실효적 치안 안전망 연계",
+        subtitle: "현장 최적 대처를 위한 의사결정 골든타임 확보",
+        bullets: [
+          "실시간 스캔 결과 위험도 지수 75% 초과 시 'Code 0(최우선출동)' 지령 및 강제 잠정조치 4호(유치장 영장) 서식 전산 즉시 완성",
+          "K-SAS V6(재정 취약성) 고득점 피해자에 대해 여성가족부 연계 지자체 긴급 생계 자금 및 은신처 비용 긴급 무심사 배정 공조망 가동",
+          "가해자의 '디지털 침묵(연락 빈도 급감)'을 범행 준비 단계로 파악하는 역발상 보안 관제로 사각지대 전소"
+        ],
+        highlight: "최종 비전: 예측 치안 모델링과 복지·사법의 선제적 융합을 통한 보복범죄 제로화"
+      }
+    ];
+
+    const SYNTHETIC_DATA_PRESETS = {
+      dispatch: [
+        {
+          title: "112 신고: 주거지 배회 및 보호조치 위반 유형",
+          v: { V1: 2, V2: 1, V3: 0, V4: 0, V5: 2, V6: 0, V7: 2 },
+          c: { C1: true, C2: false, C3: false, C4: true },
+          p: { P1: true, P2: false, P3: false, P4: false },
+          text: "[112 접수대 긴급 녹취록]\n신고인: \"경찰관님, 남친이 집 밖에서 며칠째 서성이고 있어요. 앞전에도 수 차례 신고 했는데, 경찰관이 경고하고 보냈는데, 더 자주 시간때를 짧게 자주 서성이고 있어요. 차단했는데도 다른 번호로 계속 전화가 와서 미치겠어요.\""
+        },
+        {
+          title: "112 신고: 무자력 및 반복 고소취하 유형 (K-SAS 논문 핵심)",
+          v: { V1: 1, V2: 0, V3: 2, V4: 1, V5: 1, V6: 2, V7: 0 },
+          c: { C1: true, C2: false, C3: false, C4: false },
+          p: { P1: false, P2: false, P3: false, P4: true },
+          text: "[112 상황 상담 요약]\n신고인: \"생활비를 남친 카드에 의존하고 있어서 쉽게 헤어지질 못하겠어요. 지난 주에 고소했다가 빌길래 취하서 써줬는데 어젯밤 술 마시고 들어와서는 '다시 신고하면 부모님 집 찾아가서 불 질러버린다'며 살림을 다 때려부수고 도망갔습니다. 겁이 납니다.\""
+        }
+      ],
+      investigation: [
+        {
+          title: "경찰 초기보고서: 흉기 소지 및 치밀 계획범죄",
+          v: { V1: 2, V2: 2, V3: 0, V4: 0, V5: 2, V6: 1, V7: 2 },
+          c: { C1: true, C2: true, C3: true, C4: true },
+          p: { P1: true, P2: true, P3: true, P4: false },
+          text: "[형사부 스토킹 수사 개시 보고서]\n사건 개요: 피의자는 접근금지 처분에도 불구, 렌터카를 대여해 피해자의 퇴근 루트를 정밀 매복함. 포렌식 결과 범행 전 3일간 '흉기 치명상 부위', '도어락 파손법' 검색 이력 입증됨. 피해자는 가해자가 자살을 암시하며 일가족 모두를 끝내버리겠다고 협박한 진술을 일관되게 토로함. 특수가중 스토킹 및 살인예비죄로 영장 신청 준비 중."
+        }
+      ],
+      closure: [
+        {
+          title: "검찰 종결의견서: 보복 폭력 및 잠정조치 4호 송치",
+          v: { V1: 2, V2: 2, V3: 0, V4: 0, V5: 2, V6: 1, V7: 2 },
+          c: { C1: true, C2: true, C3: true, C4: true },
+          p: { P1: true, P2: true, P3: true, P4: true },
+          text: "[수사 종결 기소 검토 의견서]\n최종 처분: 구속 기소 의견 송치\n판단 이유: 피의자는 잠정조치 2호 발령 상태 하에서도 피해자 주거지 외벽 배관을 타고 베란다 문을 부수고 침입하는 등 공권력 통제를 완벽히 비웃음. '자신은 벌금 내면 끝이다, 같이 죽는 거 외엔 답이 없다'는 처벌 공포 불감 상태를 명확히 고수하고 있어 구속 수사 유지 필수적임."
+        }
+      ]
+    };
+
+    function App() {
+      const [activeTab, setActiveTab] = useState('simulator');
+      const [currentSlide, setCurrentSlide] = useState(0);
+      const [hoveredStage, setHoveredStage] = useState(1);
+
+      // Simulator State
+      const [textType, setTextType] = useState('dispatch');
+      const [rawText, setRawText] = useState("경찰관님, 남친이 집 밖에서 며칠째 서성이고 있어요. 앞전에도 수 차례 신고 했는데, 경찰관이 경고하고 보냈는데, 더 자주 시간때를 짧게 자주 서성이고 있어요.");
+      const [reportsCount, setReportsCount] = useState(3);
+      const [reportInterval, setReportInterval] = useState(3);
+
+      // Audio Context Markers
+      const [victimDrunk, setVictimDrunk] = useState(false);
+      const [ambientNoise, setAmbientNoise] = useState(false);
+      const [perpetratorPresent, setPerpetratorPresent] = useState(false);
+
+      // K-SAS Scores
+      const [vScores, setVScores] = useState({ V1: 2, V2: 1, V3: 0, V4: 0, V5: 2, V6: 0, V7: 2 });
+      const [cScores, setCScores] = useState({ C1: true, C2: false, C3: false, C4: true });
+      const [pScores, setPScores] = useState({ P1: true, P2: false, P3: false, P4: false });
+
+      // UI Toast State
+      const [copied, setCopied] = useState(false);
+
+      // System Time State
+      const [currentTime, setCurrentTime] = useState("");
+
+      useEffect(() => {
+        const updateTime = () => {
+          const d = new Date();
+          const pad = (n) => n.toString().padStart(2, '0');
+          const formatted = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())} KST`;
+          setCurrentTime(formatted);
+        };
+        updateTime();
+        const timer = setInterval(updateTime, 1000);
+        return () => clearInterval(timer);
+      }, []);
+
+      const computeComprehensiveRisk = () => {
+        let score = 10.0;
+
+        // K-SAS V-factor score
+        const vTotal = Object.values(vScores).reduce((a, b) => a + b, 0);
+        score += vTotal * 3.8;
+
+        // Penalty for combined V6 + V7 high scores
+        if (vScores.V6 === 2 && vScores.V7 === 2) {
+          score += 15.0; 
+        }
+
+        // C and P factors
+        const cCount = Object.values(cScores).filter(Boolean).length;
+        const pCount = Object.values(pScores).filter(Boolean).length;
+        score += (cCount * 4.0) + (pCount * 4.5);
+
+        // Acceleration multiplier
+        let velocityMultiplier = 1.0;
+        if (reportsCount >= 3) {
+          if (reportInterval <= 3) velocityMultiplier = 1.8;
+          else if (reportInterval <= 7) velocityMultiplier = 1.5;
+          else if (reportInterval <= 14) velocityMultiplier = 1.25;
+        }
+        score *= velocityMultiplier;
+
+        // Real-time audio markers
+        if (victimDrunk) score += 7.0;
+        if (ambientNoise) score += 5.0;
+        if (perpetratorPresent) score += 20.0;
+
+        if (score > 100) score = 100;
+        if (!rawText || rawText.trim() === "") score = 0;
+
+        let tier = { name: "관찰 필요", color: "text-emerald-400", bg: "bg-emerald-950/40", border: "border-emerald-500/20", code: "Code 2" };
+        if (score >= 75) {
+          tier = { name: "극위험 (살인 기수 임박)", color: "text-red-500", bg: "bg-red-950/60", border: "border-red-500/80", code: "Code 0 (최우선출동)" };
+        } else if (score >= 50) {
+          tier = { name: "위험 (물리적 상해 위험)", color: "text-orange-500", bg: "bg-orange-950/40", border: "border-orange-500/40", code: "Code 1 (우선출동)" };
+        } else if (score >= 25) {
+          tier = { name: "주의 (행동 활성화 징후)", color: "text-yellow-400", bg: "bg-yellow-950/30", border: "border-yellow-500/30", code: "Code 1 (우선출동)" };
+        }
+
+        return {
+          index: score.toFixed(1),
+          vTotal,
+          cCount,
+          pCount,
+          tier
+        };
+      };
+
+      const riskResult = computeComprehensiveRisk();
+
+      const generatePoliceReport = () => {
+        return `[치안 AI 통합 위험 분석 수사 보조 진단서]
+=============================================
+사건 고유 관리 코드 : STK-2026-FT9982
+분석 시각 : ${currentTime || "2026-07-21 02:23:00 KST"}
+연계 학술 필터 : "1)한국판 스토킹 위험성 평가 도구(K-SAS).pdf" (김현우·이수정, 2023)
+데이터 조달 레퍼런스 : "데이터_조달_목록.docx"
+---------------------------------------------
+[1. 합성 데이터 서사 및 텍스트 정황]
+"${rawText}"
+
+[2. 실시간 상황실 정황 마커]
+- 피해자 방어 취약(음주) : ${victimDrunk ? "예(O) [가산]" : "아니오(X)"}
+- 통화 녹취 내 동석 대치음 : ${perpetratorPresent ? "예(O) [급박 가산]" : "아니오(X)"}
+- 수사 단위 신고 속도 : ${reportsCount}회 접수 / 간격 ${reportInterval}일 (가속 지표)
+
+[3. K-SAS 3단계 평가지표 분석 결과]
+A) 피해자 취약성 요인(V): 총점 ${riskResult.vTotal}점 / 14점 (※ 7점 임계치 돌파 여부 검증)
+   - V1 신변안전 공포 : ${vScores.V1}점 | V2 가족안전 공포 : ${vScores.V2}점
+   - V3 진술 비일관성 : ${vScores.V3}점 | V4 서비스보호 제한 : ${vScores.V4}점
+   - V5 주거환경 불안 : ${vScores.V5}점 | V6 재정적 무자력 : ${vScores.V6}점
+   - V7 사법보호 무시 : ${vScores.V7}점
+B) 범죄 구성성 요인(C) : ${riskResult.cCount}개 감지
+C) 가해자 위험 특성(P) : ${riskResult.pCount}개 감지
+
+[4. 종합 수사 의견 및 대응 프로토콜]
+- 예측 위험도 인덱스 : ${riskResult.index}%
+- 등급 평가 결과 : ${riskResult.tier.name}
+- 상황실 하명 출동 지령 : ${riskResult.tier.code}
+
+[5. 현장 수사 지침 즉각 권고 조치]
+${riskResult.index >= 75 
+  ? "- 긴급조치 100m 및 전기통신 차단 무조건 즉시 강제 개시.\n- 잠정조치 4호(유치장 처분) 및 임시 영장 서식 상황실 연동 자동 출력 완료.\n- 재정 구직 긴급 자금(V6 보정 정책) 연계 핫라인 활성화."
+  : riskResult.index >= 50
+  ? "- 스마트워치 피해자 신속 지급 절차 진행.\n- 피해자 진술 일관성 보호를 위한 여가부 상담관 실시간 가동 및 동석 연계."
+  : "- 가해자 수사과 대면 경고장 교부 및 지속적 위협 징후 모니터링 가동."}
+=============================================`;
+      };
+
+      const handleCopyReport = () => {
+        const text = generatePoliceReport();
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(text).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+          });
+        } else {
+          const tempTextArea = document.createElement("textarea");
+          tempTextArea.value = text;
+          document.body.appendChild(tempTextArea);
+          tempTextArea.select();
+          try {
+            document.execCommand("copy");
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+          } catch (err) {
+            console.error(err);
+          }
+          document.body.removeChild(tempTextArea);
+        }
+      };
+
+      const handleLoadPreset = (preset) => {
+        setRawText(preset.text);
+        setVScores({ ...preset.v });
+        setCScores({ ...preset.c });
+        setPScores({ ...preset.p });
+      };
+
+      const handleSyntheticGenerate = () => {
+        const list = SYNTHETIC_DATA_PRESETS[textType] || SYNTHETIC_DATA_PRESETS.dispatch;
+        const randomIndex = Math.floor(Math.random() * list.length);
+        handleLoadPreset(list[randomIndex]);
+      };
+
+      return (
+        <div className="min-h-screen bg-[#070913] text-slate-100 font-sans">
+          
+          {/* Header Bar */}
+          <header className="border-b border-red-950/40 bg-[#0c0e1e] px-6 py-4 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-gradient-to-tr from-red-950 to-rose-600 rounded-xl text-white shadow-lg shadow-rose-950/50 border border-rose-500/20">
+                <Shield className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-lg md:text-xl font-bold tracking-tight text-white">Stalking AI Research Lab</h1>
+                  <span className="text-[10px] bg-red-950 text-rose-400 font-extrabold px-2 py-0.5 rounded border border-rose-800/40 font-mono">2026 PROJECT</span>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">합성 수사 데이터 LLM 파인튜닝 & K-SAS 위험도 통합 시뮬레이터</p>
+              </div>
+            </div>
+
+            {/* Navigation Tabs */}
+            <div className="flex bg-[#12152b] p-1.5 rounded-xl border border-red-950/30 w-full lg:w-auto overflow-x-auto gap-1">
+              <button
+                onClick={() => setActiveTab('flowchart')}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition duration-150 whitespace-nowrap flex items-center gap-1.5 ${
+                  activeTab === 'flowchart' ? 'bg-[#991b1b] text-white shadow-md' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                연구 프로세스 도식화
+              </button>
+              <button
+                onClick={() => setActiveTab('report')}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition duration-150 whitespace-nowrap flex items-center gap-1.5 ${
+                  activeTab === 'report' ? 'bg-[#991b1b] text-white shadow-md' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                연구 계획 보고서
+              </button>
+              <button
+                onClick={() => setActiveTab('slides')}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition duration-150 whitespace-nowrap flex items-center gap-1.5 ${
+                  activeTab === 'slides' ? 'bg-[#991b1b] text-white shadow-md' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Award className="w-3.5 h-3.5" />
+                발표 자료 슬라이드
+              </button>
+              <button
+                onClick={() => setActiveTab('simulator')}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition duration-150 whitespace-nowrap flex items-center gap-1.5 ${
+                  activeTab === 'simulator' ? 'bg-[#991b1b] text-white shadow-md' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Zap className="w-3.5 h-3.5 text-yellow-400" />
+                통합 시뮬레이터
+              </button>
+            </div>
+          </header>
+
+          {/* Main Content Viewport */}
+          <main className="p-4 md:p-8 max-w-7xl mx-auto">
+
+            {/* TAB 1: 인터랙티브 연구 프로세스 도식화 */}
+            {activeTab === 'flowchart' && (
+              <div className="flex flex-col gap-6">
+                <div className="bg-[#0f1124] border border-red-950/30 rounded-2xl p-6">
+                  <h2 className="text-lg font-bold text-white flex items-center gap-2 mb-2">
+                    <Layers className="text-rose-500 w-5 h-5" />
+                    스토킹 치안 합성 데이터 및 파인튜닝 연구 로드맵
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    각 연구 수행 단계를 클릭하거나 마우스를 올려 상세 수사 설계 매커니즘을 시각적으로 확인하십시오.
+                  </p>
+                </div>
+
+                {/* Horizontal Flow Steps */}
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                  {[
+                    {
+                      id: 1,
+                      title: "1단계: 기초 변수 정의",
+                      tag: "K-SAS & KOSIS",
+                      desc: "이수정 교수 연구진의 K-SAS 27개 지표 및 통계청 가해-피해 연령, 신체폭력 유무 교차표 분석.",
+                      detail: "실제 판례분석 요인 중 '피해자 취약 요인(V)' 총점 7점 이상 고위험군 변별 지표를 모델 기초 설계값으로 고착화합니다."
+                    },
+                    {
+                      id: 2,
+                      title: "2단계: 합성 메타데이터 생성",
+                      tag: "CTGAN 합성",
+                      desc: "실제 범죄데이터 유출을 방지하기 위해 생성적 적대 신경망(CTGAN) 기반 합성 속성 세트 1,000건 도출.",
+                      detail: "변수 간 공분산 관계를 유지하며 개인정보를 배제한 가상 행렬 데이터(tabular data)를 합성해 냅니다."
+                    },
+                    {
+                      id: 3,
+                      title: "3단계: 수사 텍스트 파인튜닝",
+                      tag: "LLM Fine-Tuning",
+                      desc: "합성 속성 조합을 기반으로 Llama-3 및 Gemma를 활용해 112 긴급 신고 내용과 사건 보고서 텍스트 생성 파인튜닝.",
+                      detail: "구조화된 정형 데이터를 프롬프트로 변환하여 훈련시킨 LLM이 실제 범죄 현장과 완전히 일치하는 가상 서사를 출력하게 만듭니다."
+                    },
+                    {
+                      id: 4,
+                      title: "4단계: K-SAS NLP 파이프라인",
+                      tag: "추출 및 예측",
+                      desc: "생성된 텍스트에서 비정형 NLP 분석을 수행하여 K-SAS 지표를 정량 점수화하고 종합 위험 인덱스를 연산하는 파이프라인 구축.",
+                      detail: "신고 주기 변화율(가속도) 및 심야 소음, 동석 목소리 가중치를 실시간으로 가산해 종합 지수를 평가합니다."
+                    },
+                    {
+                      id: 5,
+                      title: "5단계: 상황실 지령 연계",
+                      tag: "사법/출동 피드백",
+                      desc: "예측 점수화된 데이터를 기반으로 위험 단계별 최적 112 조치 코드 및 긴급잠정조치 4호 구속수사 자문 자동 완성.",
+                      detail: "치안 현장에서 골든타임을 확보할 수 있도록 자동으로 최적의 경찰 수사관 대응 보고서를 완성해 제공하는 최종 의사결정 단계입니다."
+                    }
+                  ].map((stage) => (
+                    <div
+                      key={stage.id}
+                      onClick={() => setHoveredStage(stage.id)}
+                      onMouseEnter={() => setHoveredStage(stage.id)}
+                      className={`p-5 rounded-2xl border transition duration-200 cursor-pointer flex flex-col justify-between min-h-[220px] ${
+                        hoveredStage === stage.id 
+                          ? 'bg-[#1b1523] border-rose-500 shadow-lg shadow-rose-950/20 transform scale-[1.02]' 
+                          : 'bg-[#0f1124] border-red-950/20 hover:border-red-950/80'
+                      }`}
+                    >
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-rose-400 bg-rose-950/50 px-2 py-0.5 rounded border border-rose-900/30">
+                          {stage.tag}
+                        </span>
+                        <h3 className="text-sm font-bold text-white mt-3">{stage.title}</h3>
+                        <p className="text-xs text-slate-400 mt-2 line-clamp-3">{stage.desc}</p>
+                      </div>
+                      
+                      <div className="flex items-center gap-1.5 text-xs text-rose-400 font-bold mt-4">
+                        상세 수사 설계 확인
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Stage Detail Viewer */}
+                {hoveredStage && (
+                  <div className="bg-[#12142d] border border-rose-500/30 p-6 rounded-2xl">
+                    <div className="flex items-center gap-2 text-rose-400 font-bold text-sm mb-2">
+                      <Cpu className="w-4 h-4" />
+                      상세 세부 연구 프로토콜 디코딩
+                    </div>
+                    <h3 className="text-lg font-bold text-white">
+                      {hoveredStage}단계: {
+                        hoveredStage === 1 ? "K-SAS 정적 변수 분석 및 심리적 취약성 수량화" :
+                        hoveredStage === 2 ? "개인정보 완벽 배제를 위한 데이터 합성 기술 프레임워크" :
+                        hoveredStage === 3 ? "생성형 AI 모델(LLM)에 의한 가상 수사 서사 실시간 생성" :
+                        hoveredStage === 4 ? "K-SAS NLP 규칙 및 수식 기반 스코어 분석" :
+                        "112 상황 관제 시스템 및 현장 잠정조치 법적 공조 의사결정"
+                      }
+                    </h3>
+                    <p className="text-xs text-slate-300 mt-2 leading-relaxed">
+                      {
+                        hoveredStage === 1 ? "이수정 교수팀의 K-SAS 지표 중 특히 V 요인은 피해자가 이별과 거절에 따른 극심한 공포, 가족 위해 가능성 우려, 재정적 의존에 기인해 고소를 쉽게 결행하지 못하거나 취하를 일방적으로 반복하는 패턴을 다차원적으로 도출합니다. 본 단계에서는 가해자와 피해자의 복잡한 정성 정보를 정밀 인덱스로 정량화합니다." :
+                        hoveredStage === 2 ? "본 연구의 가장 핵심 원칙은 경찰 현업에서 사용되는 날 것의 개인정보가 들어있는 수사자료를 절대 직접 훈련시키지 않는다는 점입니다. 공개 실태조사를 바탕으로 특성별 우도(Likelihood) 분포를 설계한 뒤, CTGAN(Conditional Tabular GAN)을 학습시켜 메타 테이블을 먼저 생성하여 컴플라이언스 위험을 제로화합니다." :
+                        hoveredStage === 3 ? "메타데이터가 준비되면, Llama-3 등의 LLM에 파인튜닝 지시를 내립니다. '피해자 취약성 V6 점수가 2점이고, V3 점수가 2점인 상황에서 가해자의 위협 징후 C3가 결합된 112 신고 전화를 한글 자연어로 생성하라'와 같은 학습을 수행하여, 현직 전문가들도 구분하기 힘든 극실감 치안 텍스트 데이터를 확보합니다." :
+                        hoveredStage === 4 ? "합성된 비정형 데이터셋은 NLP 정밀 분석기로 다시 투입됩니다. 이 분석기는 스토킹 반복 배회, 잠복, 문전 대치, 가족을 향한 협박성 단어를 실시간 키워드 스코어링하고, 신고 시점 사이의 압축률을 가속도 요인으로 삼아 실시간 위험을 지수함수적으로 계산합니다." :
+                        "최종 산출물은 현장 경찰관이 현장에 도착하기 전 주도적으로 대피로를 파악하고 가해자 검거 및 격리(잠정조치 4호 유치장 투입 조치)를 즉각 가동할 수 있도록 사법 서식을 최적화하는 단계로, 치안의 시간적 사각지대를 완전히 없애는 것을 목표로 합니다."
+                      }
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 2: 연구 계획 보고서 뷰어 (학술서식) */}
+            {activeTab === 'report' && (
+              <div className="bg-[#0f1124] border border-red-950/30 rounded-2xl p-6 md:p-8 flex flex-col gap-6">
+                
+                <div className="border-b border-[#212440] pb-6">
+                  <span className="text-xs font-bold text-rose-400 font-mono tracking-wider">ACADEMIC RESEARCH PROPOSAL</span>
+                  <h2 className="text-2xl font-bold text-white mt-1 font-sans">
+                    K-SAS 기반 스토킹 고위험군 실시간 예측을 위한 수사 문서 합성 및 치안 LLM 파인튜닝 연구
+                  </h2>
+                  <div className="flex flex-wrap gap-4 text-xs text-slate-400 mt-4 font-mono">
+                    <span>연구 분야: 치안 과학, 범죄 인공지능, 범죄 심리학</span>
+                    <span>공동 연구원: 범죄심리학과 석사과정 및 지도교수 공조</span>
+                    <span>주요 조달 레퍼런스 : "데이터_조달_목록.docx"</span>
+                  </div>
+                </div>
+
+                <div className="text-xs text-slate-300 leading-relaxed flex flex-col gap-6 select-text">
+                  
+                  {/* Section 1 */}
+                  <div>
+                    <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 bg-rose-500 rounded-full"></span>
+                      1. 서론 및 연구 배경 (Introduction)
+                    </h3>
+                    <p className="pl-3.5">
+                      스토킹 범죄는 타인의 의사에 반하여 지속적 혹은 반복적으로 접근하거나 연락을 유발하여 공포와 불안을 자아내는 범죄다. 이는 단순한 사생활 침해에서 그치는 것이 아니라 살인, 강간 등 치명적인 강력 범죄로 파열하는 뚜렷한 '시간적 경과성'을 보인다. 이에 따라, 범행이 최고점에 다다르기 전에 고위험군을 신속하게 분별하는 것은 범죄 예방 치안 정책의 핵심 당면 과제다. 
+                    </p>
+                    <p className="pl-3.5 mt-2">
+                      최근 이수정 외 연구진(2023)은 피해자의 심리적·상황적 한계를 지표화한 '한국판 스토킹 위험성 평가도구(K-SAS)'를 제안하고, 특히 피해자 취약요인(V 요인) 총점 7점 이상일 경우 강력범죄 발생 위험도가 유의미하게 급증함을 계량적으로 검증하였다. 상세 내용은 <strong className="text-rose-400">"1)한국판 스토킹 위험성 평가 도구(K-SAS).pdf"</strong>를 기본으로 활용하며, 이 중 V-Factor 변별력 기준치인 7점(AUC=.653)의 통계 정합성을 획득하는 것을 본 연구의 기본 검증 목표로 삼는다.
+                    </p>
+                  </div>
+
+                  {/* Section 2 */}
+                  <div>
+                    <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 bg-rose-500 rounded-full"></span>
+                      2. 연구 방법론 및 합성 데이터 설계 (Methodology)
+                    </h3>
+                    <p className="pl-3.5">
+                      본 연구는 원본 수사 자료를 사용하지 않는 대안적 방법론을 활용하며, 데이터 조달 및 수집 기준은 <strong className="text-rose-400">"데이터_조달_목록.docx"</strong>에 정합성 있게 나열된 순서를 철저히 유지한다:
+                    </p>
+                    <ul className="list-disc pl-8 mt-2 flex flex-col gap-1.5">
+                      <li><strong>단계 1: 메타 데이터 모델링 (K-SAS 요인 결합):</strong> 여성폭력 실태조사 교차 통계 및 김현우·이수정(2023)의 연구에서 나타난 상관계수를 결합하여, V 요인(피해자 취약성), C 요인(범죄 요인), P 요인(가해자 위험성)의 발생 확률 밀도 함수를 매핑함.</li>
+                      <li><strong>단계 2: CTGAN을 활용한 속성 테이블 합성:</strong> 조건부 표 형태 GAN(CTGAN) 아키텍처를 훈련하여, 개인정보가 유출될 위험이 전혀 없는 가상의 스토킹 범죄 상황 1,000건의 통계 속성 매트릭스를 난수로 합성해 냄.</li>
+                      <li><strong>단계 3: 비정형 시나리오 생성 LLM 파인튜닝:</strong> 생성된 정형 속성 데이터를 입력 프롬프트로 변환, 오픈소스 대형 언어 모델(Llama-3-Ko-8B 등)을 파인튜닝하여 '112 신고 기록', '수사관 보고서', '종결 의견서' 등 비정형 수사 문서 텍스트로 자연스럽게 번역해 냄.</li>
+                    </ul>
+                  </div>
+
+                  {/* Section 3 */}
+                  <div>
+                    <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 bg-rose-500 rounded-full"></span>
+                      3. K-SAS 실시간 스코어링 공식 및 가속도 결합
+                    </h3>
+                    <p className="pl-3.5">
+                      합성 생성된 텍스트는 시스템 상에서 K-SAS 수치 및 가속 요인을 결합한 정밀 알고리즘으로 평가된다.
+                    </p>
+                    <div className="bg-[#090b0e] p-4 rounded-xl border border-red-950/20 font-mono text-slate-300 my-3 pl-6">
+                      Risk Index = ( [K-SAS V-Total] * 3.5 + [C-Count] * 4.0 + [P-Count] * 4.5 ) * Acceleration_Multiplier<br />
+                      - Acceleration_Multiplier = 1.8 (신고 주기성 이틀 이내 압축 검출 시)<br />
+                      - 실시간 배경음 동석 목소리 감지 시 +18.0 추가 가산
+                    </div>
+                    <p className="pl-3.5">
+                      특히 피해자가 술에 취한 취약한 목소리로 전화를 하거나, 수화기 너머로 가해자의 위협적인 배경 동석 음성이 검출될 경우, 단순 스토킹이 아닌 살인 기수가 실시간으로 임박한 상태로 판단하여 경보를 극대화한다.
+                    </p>
+                  </div>
+
+                  {/* Section 4 */}
+                  <div>
+                    <h3 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 bg-rose-500 rounded-full"></span>
+                      4. 기대효과 및 향후 학술 기여
+                    </h3>
+                    <p className="pl-3.5">
+                      본 연구는 경찰 치안 데이터 수집의 한계를 극복하고 범죄 모델의 실전성을 높인다. 수사관이 현장에 임하기 전, 이 시뮬레이터가 작성한 K-SAS 상황 진단서를 공유받음으로써 즉각 구속 영장 및 잠정조치 4호를 신청할지 여부를 5초 만에 판단할 수 있어 현장 골든타임 확보에 혁혁한 치안적 기여를 할 것으로 전망된다.
+                    </p>
+                  </div>
+
+                </div>
+              </div>
+            )}
+
+            {/* TAB 3: 학술대회 발표 슬라이드 데스크탑 프리뷰 */}
+            {activeTab === 'slides' && (
+              <div className="bg-[#0f1124] border border-red-950/30 rounded-2xl p-6 md:p-8 flex flex-col gap-6">
+                
+                {/* Slide Controls Header */}
+                <div className="flex justify-between items-center border-b border-[#212440] pb-4">
+                  <div>
+                    <span className="text-xs text-rose-400 font-bold">세미나/지도교수 상담용 발표 자료 덱</span>
+                    <h3 className="text-base font-bold text-white mt-1">K-SAS 치안 합성 파인튜닝 연구</h3>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCurrentSlide(prev => Math.max(0, prev - 1))}
+                      disabled={currentSlide === 0}
+                      className="p-2 bg-[#12152b] hover:bg-[#1f2343] text-white rounded-lg border border-[#2d3748] disabled:opacity-40 disabled:hover:bg-[#12152b]"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <span className="text-xs font-mono font-bold text-white">
+                      {currentSlide + 1} / {PRESENTATION_SLIDES.length}
+                    </span>
+                    <button
+                      onClick={() => setCurrentSlide(prev => Math.min(PRESENTATION_SLIDES.length - 1, prev + 1))}
+                      disabled={currentSlide === PRESENTATION_SLIDES.length - 1}
+                      className="p-2 bg-[#12152b] hover:bg-[#1f2343] text-white rounded-lg border border-[#2d3748] disabled:opacity-40 disabled:hover:bg-[#12152b]"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Slide Canvas */}
+                <div className="bg-[#090b0e] border border-red-950/30 rounded-2xl p-8 md:p-12 min-h-[360px] flex flex-col justify-between shadow-inner">
+                  
+                  <div>
+                    <span className="text-xs text-rose-400 font-bold uppercase tracking-widest font-mono">
+                      Slide {currentSlide + 1}
+                    </span>
+                    <h2 className="text-xl md:text-2xl font-extrabold text-white mt-2 font-sans">
+                      {PRESENTATION_SLIDES[currentSlide].title}
+                    </h2>
+                    <h4 className="text-xs md:text-sm text-slate-400 font-medium mt-1">
+                      {PRESENTATION_SLIDES[currentSlide].subtitle}
+                    </h4>
+
+                    {/* Bullets */}
+                    <ul className="mt-6 flex flex-col gap-3">
+                      {PRESENTATION_SLIDES[currentSlide].bullets.map((bullet, idx) => (
+                        <li key={idx} className="flex items-start gap-2.5 text-xs md:text-sm text-slate-300 leading-relaxed">
+                          <span className="w-2.5 h-1 bg-rose-500 rounded-full mt-2 shrink-0"></span>
+                          <span>{bullet}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Bottom Highlight */}
+                  <div className="mt-8 pt-4 border-t border-red-950/30 flex items-center gap-2 text-rose-400 font-bold text-xs md:text-sm bg-red-950/10 p-3 rounded-xl border border-red-950/20">
+                    <Zap className="w-4 h-4 text-yellow-400 shrink-0" />
+                    <span>{PRESENTATION_SLIDES[currentSlide].highlight}</span>
+                  </div>
+
+                </div>
+
+                {/* Navigation Dots */}
+                <div className="flex justify-center gap-2">
+                  {PRESENTATION_SLIDES.map((_, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setCurrentSlide(idx)}
+                      className={`h-3 rounded-full transition-all duration-150 ${
+                        currentSlide === idx ? 'bg-rose-500 w-8' : 'bg-[#212440] hover:bg-slate-400 w-3'
+                      }`}
+                    />
+                  ))}
+                </div>
+
+              </div>
+            )}
+
+            {/* TAB 4: 통합 시뮬레이터 프로그램 뷰어 */}
+            {activeTab === 'simulator' && (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                
+                {/* Left Controls (7/12) */}
+                <div className="lg:col-span-7 flex flex-col gap-6">
+                  
+                  {/* Synthetic Data Generator Card */}
+                  <div className="bg-[#0f1124] border border-red-950/30 rounded-2xl p-6 flex flex-col gap-4">
+                    
+                    <div className="flex items-center justify-between border-b border-[#212440] pb-3">
+                      <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                        <Database className="text-rose-500 w-4 h-4" />
+                        Fine-Tuned LLM 가상 데이터 합성기
+                      </h3>
+                      <span className="text-[10px] bg-emerald-950 text-emerald-400 font-mono font-bold px-2 py-0.5 rounded border border-emerald-800/30">
+                        학습 데이터셋: 1,000건 모델링 완료
+                      </span>
+                    </div>
+
+                    {/* Preset Scenarios */}
+                    <div>
+                      <span className="text-[11px] font-bold text-slate-400 block mb-2">사례 기반 가상 시나리오 즉시 주입 (원클릭 매핑)</span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {SYNTHETIC_DATA_PRESETS.dispatch.map((preset, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => handleLoadPreset(preset)}
+                            className="p-2.5 text-left text-xs bg-[#12152b] hover:bg-[#1c224c] border border-red-950/30 rounded-xl transition flex flex-col"
+                          >
+                            <span className="font-bold text-white">{preset.title}</span>
+                            <span className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">{preset.text}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Document Type Selector */}
+                    <div className="grid grid-cols-3 gap-2 mt-2">
+                      <button
+                        onClick={() => setTextType('dispatch')}
+                        className={`py-2 text-xs font-bold rounded-xl border transition ${
+                          textType === 'dispatch' 
+                            ? 'bg-[#4c0519] text-rose-400 border-rose-800' 
+                            : 'bg-[#15172b] text-slate-400 border-[#212440] hover:bg-[#1f2343]'
+                        }`}
+                      >
+                        112 신고 기록 합성
+                      </button>
+                      <button
+                        onClick={() => setTextType('investigation')}
+                        className={`py-2 text-xs font-bold rounded-xl border transition ${
+                          textType === 'investigation' 
+                            ? 'bg-[#4c0519] text-rose-400 border-rose-800' 
+                            : 'bg-[#15172b] text-slate-400 border-[#212440] hover:bg-[#1f2343]'
+                        }`}
+                      >
+                        수사 초기보고서 합성
+                      </button>
+                      <button
+                        onClick={() => setTextType('closure')}
+                        className={`py-2 text-xs font-bold rounded-xl border transition ${
+                          textType === 'closure' 
+                            ? 'bg-[#4c0519] text-rose-400 border-rose-800' 
+                            : 'bg-[#15172b] text-slate-400 border-[#212440] hover:bg-[#1f2343]'
+                        }`}
+                      >
+                        수사 종결보고서 합성
+                      </button>
+                    </div>
+
+                    {/* Generate Run Button */}
+                    <button
+                      onClick={handleSyntheticGenerate}
+                      className="w-full py-3 bg-gradient-to-r from-red-800 to-rose-600 hover:from-rose-600 hover:to-red-800 text-white text-xs font-bold rounded-xl shadow-lg shadow-rose-950/40 transition duration-150 flex items-center justify-center gap-2"
+                    >
+                      <Play className="w-3.5 h-3.5 fill-current" />
+                      스토킹 가상 합성 수사 데이터 실시간 생성 (Generative Run)
+                    </button>
+
+                  </div>
+
+                  {/* Generated Text View */}
+                  <div className="bg-[#0f1124] border border-red-950/30 rounded-2xl p-6 flex flex-col gap-4">
+                    <label className="text-xs font-bold text-slate-300 block">
+                      생성된 가상 수사 서사 자연어 (Fine-Tuned NLP 스캔 타겟)
+                    </label>
+                    <textarea
+                      value={rawText}
+                      onChange={(e) => setRawText(e.target.value)}
+                      className="w-full h-36 bg-[#090b0e] border border-[#212440] focus:border-rose-500 rounded-xl p-4 text-xs text-slate-200 placeholder-slate-700 focus:outline-none transition leading-relaxed resize-none"
+                      placeholder="위 버튼을 클릭하여 합성 데이터를 생성하거나, 직접 스토킹 협박 메시지나 진술 기록을 입력해 보십시오."
+                    />
+
+                    {/* 112 Dispatch Velocity Controls */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="bg-[#090b0e] p-4 rounded-xl border border-[#212440]">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-xs text-slate-400">최근 112 신고 누적 횟수</span>
+                          <span className="text-xs font-bold font-mono text-rose-400">{reportsCount}회</span>
+                        </div>
+                        <input
+                          type="range" min="0" max="10" value={reportsCount}
+                          onChange={(e) => setReportsCount(parseInt(e.target.value))}
+                          className="w-full accent-rose-500"
+                        />
+                      </div>
+
+                      <div className="bg-[#090b0e] p-4 rounded-xl border border-[#212440]">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-xs text-slate-400">재범 및 연속 연락 간격</span>
+                          <span className="text-xs font-bold font-mono text-rose-400">{reportInterval}일</span>
+                        </div>
+                        <input
+                          type="range" min="1" max="90" value={reportInterval}
+                          onChange={(e) => setReportInterval(parseInt(e.target.value))}
+                          className="w-full accent-rose-500"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Context audio switches */}
+                    <div>
+                      <span className="text-[11px] font-bold text-slate-400 block mb-2">실시간 통화 음향 및 정황 분석 마커 (경찰 접수원 실시간 체크 대행)</span>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <button
+                          onClick={() => setAmbientNoise(!ambientNoise)}
+                          className={`p-2.5 text-[11px] font-bold rounded-xl border transition ${
+                            ambientNoise ? 'bg-red-950/40 text-rose-400 border-rose-900' : 'bg-[#090b0e] text-slate-500 border-[#212440]'
+                          }`}
+                        >
+                          주변 소음 극심 (Code 1+)
+                        </button>
+                        <button
+                          onClick={() => setVictimDrunk(!victimDrunk)}
+                          className={`p-2.5 text-[11px] font-bold rounded-xl border transition ${
+                            victimDrunk ? 'bg-red-950/40 text-rose-400 border-rose-900' : 'bg-[#090b0e] text-slate-500 border-[#212440]'
+                          }`}
+                        >
+                          피해자 음주 상태 (취약성+)
+                        </button>
+                        <button
+                          onClick={() => setPerpetratorPresent(!perpetratorPresent)}
+                          className={`p-2.5 text-[11px] font-bold rounded-xl border transition ${
+                            perpetratorPresent ? 'bg-red-950/40 text-rose-400 border-rose-900' : 'bg-[#090b0e] text-slate-500 border-[#212440]'
+                          }`}
+                        >
+                          가해자 동석/대치 청취
+                        </button>
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* K-SAS V1~V7 Score Rating Panel */}
+                  <div className="bg-[#0f1124] border border-red-950/30 rounded-2xl p-6 flex flex-col gap-4">
+                    <div className="flex items-center justify-between border-b border-[#212440] pb-2">
+                      <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-ping"></span>
+                        K-SAS 피해자 취약성 문항 평정판 (V1~V7)
+                      </h4>
+                      <span className="text-xs text-rose-400 font-bold font-mono">V요인 합산: {riskResult.vTotal}점 / 14점</span>
+                    </div>
+
+                    <div className="flex flex-col gap-4">
+                      {KSAS_V_ITEMS.map((item) => (
+                        <div key={item.id} className="border-b border-red-950/10 pb-3 last:border-0 last:pb-0">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <span className="text-[11px] font-bold text-slate-200">
+                                {item.id}. {item.title}
+                              </span>
+                              <p className="text-[9px] text-slate-500">{item.desc}</p>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 mt-2">
+                            {item.weights.map((w) => (
+                              <button
+                                key={w.score}
+                                onClick={() => setVScores({ ...vScores, [item.id]: w.score })}
+                                className={`py-1.5 text-[10px] rounded-lg font-bold border transition ${
+                                  vScores[item.id] === w.score
+                                    ? 'bg-red-950 text-rose-400 border-rose-500'
+                                    : 'bg-[#090b0e] text-slate-500 border-[#212440] hover:bg-[#12142d]'
+                                }`}
+                              >
+                                {w.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* C-Factor & P-Factor Checklists */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="bg-[#0f1124] border border-red-950/30 rounded-2xl p-5">
+                      <h4 className="text-xs font-bold text-white mb-3">상황적 범죄 행위 (C-Factors)</h4>
+                      <div className="flex flex-col gap-2">
+                        {KSAS_C_ITEMS.map(item => (
+                          <label key={item.id} className="flex items-start gap-2 p-2 rounded-lg bg-[#090b0e] border border-red-950/10 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={cScores[item.id]}
+                              onChange={(e) => setCScores({ ...cScores, [item.id]: e.target.checked })}
+                              className="mt-0.5 accent-rose-500"
+                            />
+                            <div>
+                              <span className="text-[11px] font-bold text-slate-200 block">{item.title}</span>
+                              <span className="text-[9px] text-slate-500">{item.desc}</span>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="bg-[#0f1124] border border-red-950/30 rounded-2xl p-5">
+                      <h4 className="text-xs font-bold text-white mb-3">가해자 위험 폭력성 (P-Factors)</h4>
+                      <div className="flex flex-col gap-2">
+                        {KSAS_P_ITEMS.map(item => (
+                          <label key={item.id} className="flex items-start gap-2 p-2 rounded-lg bg-[#090b0e] border border-red-950/10 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={pScores[item.id]}
+                              onChange={(e) => setPScores({ ...pScores, [item.id]: e.target.checked })}
+                              className="mt-0.5 accent-rose-500"
+                            />
+                            <div>
+                              <span className="text-[11px] font-bold text-slate-200 block">{item.title}</span>
+                              <span className="text-[9px] text-slate-500">{item.desc}</span>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Right Risk Assessment Output (5/12) */}
+                <div className="lg:col-span-5 flex flex-col gap-6">
+                  
+                  {/* Risk Gauge Widget */}
+                  <div className="bg-[#0f1124] border border-red-950/30 rounded-2xl p-6 flex flex-col items-center justify-center text-center">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 block">스토킹 위험도 분석 종합 지표</span>
+                    
+                    {/* SVG Radial Gauge */}
+                    <div className="relative flex items-center justify-center w-40 h-40">
+                      <svg className="w-full h-full transform -rotate-90">
+                        <circle
+                          cx="80" cy="80" r="68"
+                          className="stroke-[#12152b]" strokeWidth="10" fill="transparent"
+                        />
+                        <circle
+                          cx="80" cy="80" r="68"
+                          className={`transition-all duration-500 ease-out ${
+                            parseFloat(riskResult.index) >= 75 ? "stroke-red-500" : parseFloat(riskResult.index) >= 50 ? "stroke-orange-500" : "stroke-yellow-400"
+                          }`}
+                          strokeWidth="10" fill="transparent"
+                          strokeDasharray={2 * Math.PI * 68}
+                          strokeDashoffset={2 * Math.PI * 68 * (1 - parseFloat(riskResult.index) / 100)}
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                      <div className="absolute flex flex-col items-center">
+                        <span className="text-4xl font-extrabold text-white font-mono">{riskResult.index}%</span>
+                        <span className="text-[9px] text-rose-400 flex items-center gap-1 mt-1">
+                          <Clock className="w-3 h-3 text-rose-500" />
+                          실시간 스캔 완료
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className={`mt-5 p-4 rounded-xl border text-center w-full transition ${riskResult.tier.bg} ${riskResult.tier.border}`}>
+                      <span className={`text-base font-extrabold ${riskResult.tier.color} block`}>
+                        {riskResult.tier.name}
+                      </span>
+                      <div className="mt-1 flex items-center justify-center gap-2">
+                        <span className="text-xs text-slate-400">대응출동 지령코드:</span>
+                        <span className="text-xs font-bold font-mono text-white px-2 py-0.5 bg-black/40 rounded border border-white/10">
+                          {riskResult.tier.code}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Police Report Terminal */}
+                  <div className="bg-[#0f1124] border border-red-950/30 rounded-2xl p-6 flex flex-col flex-1">
+                    <div className="flex justify-between items-center mb-3">
+                      <h3 className="text-xs font-bold text-white flex items-center gap-1.5">
+                        <FileText className="w-4 h-4 text-rose-400" />
+                        수사보조 상황 보고서 출력 (K-SAS 진단서)
+                      </h3>
+                      <button
+                        onClick={handleCopyReport}
+                        className="flex items-center gap-1 px-3 py-1 bg-red-950/40 hover:bg-red-950 text-xs font-bold rounded-lg border border-red-900/30 text-rose-400 transition"
+                      >
+                        {copied ? (
+                          <span className="flex items-center gap-1 text-emerald-400">
+                            <Check className="w-3 h-3" /> 복사 완료
+                          </span>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3" />
+                            보고서 내보내기
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    <div className="bg-[#060810] border border-red-950/20 rounded-xl p-4 flex-1 font-mono text-[10.5px] text-slate-300 leading-relaxed overflow-y-auto max-h-[380px] md:max-h-[500px] whitespace-pre-wrap select-all shadow-inner">
+                      {generatePoliceReport()}
+                    </div>
+                  </div>
+
+                </div>
+
+              </div>
+            )}
+
+          </main>
+
+          {/* Global Footer */}
+          <footer className="border-t border-red-950/40 bg-[#0c0e1e] py-6 px-8 text-center text-xs text-slate-500 mt-12">
+            <p>© 2026 Stalking Risk Evaluation Research Group. All Rights Reserved. 본 프로그램은 한국판 스토킹 위험성 평가 도구(K-SAS) 계수 검증용 시뮬레이터입니다.</p>
+          </footer>
+
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
