@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guardians 112 상황실 시뮬레이션</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        body { background-color: #0f172a; color: #f8fafc; font-family: 'Pretendard', -apple-system, sans-serif; }
+        .glass-panel { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid #334155; }
+        
+        /* 커스텀 스크롤바 */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        
+        /* 게이지 미터기 애니메이션 */
+        .gauge-path { transition: stroke-dashoffset 1s cubic-bezier(0.4, 0, 0.2, 1); }
+        .needle { transition: transform 1s cubic-bezier(0.4, 0, 0.2, 1); transform-origin: 100px 100px; }
+        
+        /* 메시지 등장 애니메이션 */
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .msg-animate { animation: slideIn 0.4s ease-out forwards; }
+    </style>
+</head>
+<body class="min-h-screen p-6">
+
+    <!-- Header -->
+    <header class="max-w-7xl mx-auto flex items-center justify-between glass-panel p-5 rounded-2xl shadow-xl mb-6">
+        <div class="flex items-center gap-4">
+            <div class="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center border border-blue-500/50">
+                <i class="fa-solid fa-shield-halved text-blue-400 text-2xl"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold tracking-wide">Guardians <span class="text-blue-400 font-light">112 AI 상황실</span></h1>
+                <p class="text-sm text-slate-400 flex items-center gap-2 mt-1">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    sLLM 텍스트 임베딩 동적 추론망 가동 중 (Phase 3)
+                </p>
+            </div>
+        </div>
+        <div class="flex gap-3">
+            <div class="glass-panel px-4 py-2 rounded-lg flex items-center gap-2 text-sm text-slate-300">
+                <i class="fa-solid fa-microchip text-indigo-400"></i>
+                <select id="model-select" class="bg-transparent outline-none cursor-pointer">
+                    <option value="qwen2">Qwen2-7B-Embed (로컬)</option>
+                    <option value="llama3">LLaMA3.2-3B (로컬)</option>
+                </select>
+            </div>
+            <button onclick="resetSimulation()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-sm transition font-medium">
+                <i class="fa-solid fa-rotate-right mr-1"></i> 초기화
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Layout -->
+    <main class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- Left: Chat Interface -->
+        <div class="lg:col-span-7 glass-panel rounded-2xl flex flex-col h-[760px] shadow-2xl relative overflow-hidden">
+            <div class="bg-slate-800/90 backdrop-blur p-4 border-b border-slate-700 flex justify-between items-center z-10 absolute w-full top-0">
+                <span class="font-semibold text-slate-200"><i class="fa-solid fa-headset text-blue-400 mr-2"></i>실시간 신고 텍스트 스트리밍 (STT)</span>
+                <span id="current-time" class="text-xs font-mono text-slate-400 bg-slate-900 px-2 py-1 rounded"></span>
+            </div>
+
+            <!-- Chat Area -->
+            <div id="chat-container" class="flex-1 overflow-y-auto p-6 pt-20 pb-24 space-y-5">
+                <div class="h-full flex flex-col items-center justify-center text-slate-500 gap-3">
+                    <div class="w-20 h-20 rounded-full bg-slate-800 flex items-center justify-center mb-2 border border-slate-700">
+                        <i class="fa-solid fa-robot text-4xl opacity-50 text-blue-400"></i>
+                    </div>
+                    <p class="font-medium text-slate-400">10단계 다이나믹 시나리오 대기 중</p>
+                    <p class="text-sm opacity-60">하단의 '시나리오 테스트' 버튼을 눌러 진행하세요.</p>
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="bg-slate-800 border-t border-slate-700 p-4 absolute bottom-0 w-full z-10">
+                <div class="flex gap-2">
+                    <button onclick="simulateNextScenario()" id="sim-btn" class="bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-900/50 text-white px-5 py-3 rounded-xl flex items-center gap-2 transition whitespace-nowrap font-bold">
+                        <i class="fa-solid fa-bolt"></i> 시나리오 테스트 (<span id="step-count">0/10</span>)
+                    </button>
+                    <div class="flex-1 relative">
+                        <input type="text" id="custom-input" placeholder="직접 텍스트를 입력하여 테스트..." class="w-full bg-slate-900 border border-slate-700 text-slate-100 px-4 py-3 rounded-xl outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition pr-12" onkeypress="if(event.key === 'Enter') sendCustomMessage()">
+                        <button onclick="sendCustomMessage()" class="absolute right-2 top-2 bottom-2 bg-blue-500 hover:bg-blue-400 text-white w-10 rounded-lg flex justify-center items-center transition">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Dashboard -->
+        <div class="lg:col-span-5 flex flex-col gap-6">
+            
+            <!-- Card 1: 10-level Risk Gauge -->
+            <div class="glass-panel rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl -mr-10 -mt-10"></div>
+                <h2 class="text-lg font-bold flex items-center gap-2 mb-2 border-b border-slate-700 pb-3">
+                    <i class="fa-solid fa-gauge-high text-blue-400"></i> 동적 위험도 계기판
+                </h2>
+                
+                <div class="flex flex-col items-center justify-center py-6 relative">
+                    <svg width="280" height="150" viewBox="0 0 200 110" class="overflow-visible">
+                        <defs>
+                            <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" stopColor="#3b82f6" /> <!-- Blue (Safe/Prank) -->
+                                <stop offset="30%" stopColor="#10b981" /> <!-- Green -->
+                                <stop offset="60%" stopColor="#f59e0b" /> <!-- Yellow -->
+                                <stop offset="100%" stopColor="#ef4444" /> <!-- Red -->
+                            </linearGradient>
+                        </defs>
+                        <!-- Background arc -->
+                        <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#1e293b" stroke-width="18" stroke-linecap="round"/>
+                        <!-- Value arc (dasharray = Math.PI * 80 = ~251.2) -->
+                        <path id="gauge-value" class="gauge-path" d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="url(#gaugeGradient)" stroke-width="18" stroke-linecap="round" stroke-dasharray="251.2" stroke-dashoffset="251.2"/>
+                        <!-- Needle -->
+                        <g id="gauge-needle" class="needle" transform="rotate(-90)">
+                            <polygon points="-4,0 4,0 0,-70" fill="#f8fafc" />
+                            <circle cx="0" cy="0" r="8" fill="#f8fafc" />
+                            <circle cx="0" cy="0" r="3" fill="#0f172a" />
+                        </g>
+                    </svg>
+                    <div class="absolute bottom-[-15px] text-center w-full">
+                        <div class="text-5xl font-extrabold text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]" id="risk-display">
+                            0 <span class="text-2xl text-slate-500 font-normal">/ 10</span>
+                        </div>
+                        <div id="prob-display" class="text-sm font-mono text-slate-400 mt-2 bg-slate-900/50 inline-block px-3 py-1 rounded-full border border-slate-700">임베딩 확률: p=0.00</div>
+                    </div>
+                </div>
+                
+                <div class="mt-8 flex justify-center">
+                    <div id="status-display" class="text-base font-bold px-6 py-2 rounded-lg border bg-slate-800 text-slate-500 border-slate-700 shadow-inner">
+                        <i class="fa-solid fa-circle-notch fa-spin mr-2 opacity-50"></i>대기 중
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 2: Time-series Chart -->
+            <div class="glass-panel rounded-2xl p-6 shadow-xl flex-1 flex flex-col">
+                <h2 class="text-lg font-bold flex items-center gap-2 mb-2 border-b border-slate-700 pb-3">
+                    <i class="fa-solid fa-chart-area text-emerald-400"></i> 위험도 시계열 변동 (Escalation)
+                </h2>
+                <div class="w-full flex-1 relative min-h-[220px]">
+                    <canvas id="riskChart"></canvas>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        // 10단계 다이나믹 시나리오 (오인/장난 포함)
+        const SCENARIOS = [
+            { text: "여보세요, 누가 자꾸 집 주변을 서성거려요. 불안해서요.", intent: "[경계]" },
+            { text: "아, 죄송합니다. 옆집 손님이 집을 잘못 찾은 거였네요. 오해했습니다.", intent: "[오인]" },
+            { text: "경찰서죠? 아까 그 사람 말고... 이번엔 진짜 제 전 남친이 집 앞에 온 것 같아요.", intent: "[주의]" },
+            { text: "계속 초인종을 누르고 제 이름을 부르고 있어요. 너무 무서워요.", intent: "[경고]" },
+            { text: "방금 전 남친이 문자로 그냥 장난이었다고, 미안하다고 돌아갔어요. 안 오셔도 될 것 같아요.", intent: "[가해자 기만/오인]" },
+            { text: "살려주세요! 돌아간 줄 알았는데 갑자기 창문을 깨고 들어오려고 해요!!", intent: "[긴급]" },
+            { text: "문이 부서졌어요! 발로 차고 들어왔어요!! 어떡해요!!", intent: "[최고 긴급]" },
+            { text: "경찰관님 빨리요! 앗, 이웃 아저씨가 소리치니까 잠깐 밖으로 도망갔어요.", intent: "[상황 변동/도주]" },
+            { text: "다시 와서 이웃 아저씨한테 칼을 휘둘러요! 피가 나요!!", intent: "[최고 긴급]" },
+            { text: "네, 경찰관님들이 방금 도착하셔서 제압하셨습니다. 119 좀 빨리 보내주세요.", intent: "[응급 종료/사후조치]" }
+        ];
+        
+        let scenarioIndex = 0;
+        let riskHistory = [];
+        let chartInstance = null;
+
+        // sLLM 임베딩 시뮬레이션: 텍스트 문맥 분석 (감소 및 증가 로직 동시 적용)
+        function calculateRiskProbability(text) {
+            let prob = 0.1;
+            const t = text.toLowerCase();
+            
+            // 1. 상황 완화/감소 키워드 (오인, 장난, 상황종료)
+            if (t.includes('오해') || t.includes('잘못') || t.includes('죄송합니다') || t.includes('장난')) {
+                return 0.15; // 확률 급감 (Level 2)
+            }
+            if (t.includes('제압') || t.includes('상황 끝')) {
+                return 0.35; // 사후 조치 단계 (Level 4)
+            }
+            if (t.includes('도망')) {
+                return 0.65; // 가해자 이탈이나 여전히 위험 (Level 7)
+            }
+
+            // 2. 위험 증가 키워드
+            if (t.includes('서성') || t.includes('불안')) prob += 0.2;
+            if (t.includes('전 남친') || t.includes('초인종') || t.includes('온 것')) prob += 0.3;
+            if (t.includes('무서워') || t.includes('부르고')) prob += 0.2;
+            if (t.includes('창문') || t.includes('깨고') || t.includes('부서졌') || t.includes('발로')) prob += 0.5;
+            if (t.includes('살려') || t.includes('칼') || t.includes('흉기') || t.includes('피가') || t.includes('휘둘러')) prob += 0.7;
+
+            // 3. 에스컬레이션(누적) 반영: 위험이 지속될 경우 가중치 증가
+            const prevProb = riskHistory.length > 0 ? riskHistory[riskHistory.length - 1] / 10 : 0;
+            prob = prob + (prevProb * 0.35); // 이전 위험의 35%를 이어받음
+
+            return Math.min(Math.max(prob, 0.1), 0.99); // 0.1 ~ 0.99 캡핑
+        }
+
+        // 디자인 유틸리티: 위험도별 컬러 및 텍스트 매핑
+        function getRiskTheme(level) {
+            if (level >= 9) return { color: '#ef4444', text: '🔥 긴급 (즉시 출동 및 무력 제압)', bg: '#ef444420' }; // Red
+            if (level >= 7) return { color: '#f97316', text: '🚨 응급 (타부서 즉시 연계 요망)', bg: '#f9731620' }; // Orange
+            if (level >= 5) return { color: '#facc15', text: '⚠️ 주의 (에스컬레이션 징후)', bg: '#facc1520' }; // Yellow
+            if (level >= 3) return { color: '#10b981', text: '👀 경계 (상황 지속 관찰)', bg: '#10b98120' }; // Green
+            return { color: '#3b82f6', text: '✅ 오인/장난 (현장 종결/안전)', bg: '#3b82f620' }; // Blue
+        }
+
+        // Chart.js 초기화
+        function initChart() {
+            const ctx = document.getElementById('riskChart').getContext('2d');
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: '산출된 위험도(Level)',
+                        data: [],
+                        borderColor: '#38bdf8',
+                        backgroundColor: 'rgba(56, 189, 248, 0.15)',
+                        borderWidth: 3,
+                        pointBackgroundColor: '#0f172a',
+                        pointBorderColor: function(context) {
+                            const val = context.raw;
+                            if (val >= 9) return '#ef4444';
+                            if (val >= 7) return '#f97316';
+                            if (val >= 5) return '#facc15';
+                            if (val >= 3) return '#10b981';
+                            return '#3b82f6';
+                        },
+                        pointBorderWidth: 2,
+                        pointRadius: 6,
+                        pointHoverRadius: 8,
+                        fill: true,
+                        tension: 0.4 // 부드러운 곡선 처리
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { min: 0, max: 10, grid: { color: '#334155' }, ticks: { color: '#94a3b8', font: {family: 'Pretendard'} } },
+                        x: { grid: { display: false }, ticks: { color: '#94a3b8', font: {family: 'Pretendard'} } }
+                    },
+                    plugins: { 
+                        legend: { display: false },
+                        tooltip: { backgroundColor: 'rgba(15, 23, 42, 0.9)', titleFont: {family: 'Pretendard'}, bodyFont: {family: 'Pretendard'} }
+                    }
+                }
+            });
+        }
+
+        // 메시지 추가 및 UI 동적 업데이트 함수
+        function processMessage(scenarioObj) {
+            const text = typeof scenarioObj === 'string' ? scenarioObj : scenarioObj.text;
+            const intent = typeof scenarioObj === 'string' ? '[직접입력]' : scenarioObj.intent;
+            
+            const chatContainer = document.getElementById('chat-container');
+            if (riskHistory.length === 0) chatContainer.innerHTML = ''; // 초기 헬퍼 메시지 제거
+
+            // 1. 모델 임베딩 확률 연산
+            const prob = calculateRiskProbability(text);
+            const level = Math.ceil(prob * 10);
+            riskHistory.push(level);
+
+            const now = new Date();
+            const timeString = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0') + ':' + now.getSeconds().toString().padStart(2, '0');
+            const theme = getRiskTheme(level);
+
+            // 2. 채팅창 UI 렌더링
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'flex flex-col items-start gap-1 mb-2 msg-animate';
+            
+            msgDiv.innerHTML = `
+                <div class="flex items-center gap-2 ml-1">
+                    <span class="text-xs text-slate-500 font-mono">${timeString}</span>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded text-white" style="background-color: ${theme.color}">${intent}</span>
+                </div>
+                <div class="bg-slate-700 text-slate-100 px-4 py-3 rounded-2xl rounded-tl-sm max-w-[85%] shadow-lg leading-relaxed border-l-4 text-[15px]" style="border-color: ${theme.color}">
+                    ${text}
+                </div>
+                <div class="text-[11px] font-mono px-2 py-1 rounded-md mt-1 flex items-center gap-1.5 border" style="background-color: ${theme.bg}; color: ${theme.color}; border-color: ${theme.color}40;">
+                    <i class="fa-solid fa-network-wired"></i> Model Score: ${prob.toFixed(3)} ➔ <span class="font-bold">Level ${level}</span>
+                </div>
+            `;
+            chatContainer.appendChild(msgDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            // 3. 중앙 게이지 미터기 업데이트
+            const dasharray = 251.2; 
+            const fillPercentage = (level / 10) * 100;
+            const offset = dasharray - (fillPercentage / 100) * dasharray;
+            const rotation = (level / 10) * 180 - 90;
+
+            document.getElementById('gauge-value').style.strokeDashoffset = offset;
+            document.getElementById('gauge-needle').style.transform = `rotate(${rotation}deg)`;
+            
+            // 위험도 텍스트 애니메이션 및 색상 변경
+            const riskDisplay = document.getElementById('risk-display');
+            riskDisplay.innerHTML = `${level} <span class="text-2xl font-normal opacity-50">/ 10</span>`;
+            riskDisplay.style.color = theme.color;
+            
+            document.getElementById('prob-display').innerHTML = `AI 산출 확률: p=<span class="font-bold text-slate-200">${prob.toFixed(3)}</span>`;
+            
+            const statusEl = document.getElementById('status-display');
+            statusEl.innerHTML = `<i class="fa-solid ${level >= 7 ? 'fa-triangle-exclamation animate-pulse' : 'fa-check'} mr-2"></i>${theme.text}`;
+            statusEl.style.color = theme.color;
+            statusEl.style.borderColor = theme.color + '50';
+            statusEl.style.backgroundColor = theme.bg;
+
+            // 4. 차트 업데이트
+            chartInstance.data.labels.push(timeString);
+            chartInstance.data.datasets[0].data.push(level);
+            chartInstance.update();
+        }
+
+        // 시나리오 순차 재생 버튼 이벤트
+        function simulateNextScenario() {
+            if (scenarioIndex < SCENARIOS.length) {
+                const btn = document.getElementById('sim-btn');
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 분석 중...';
+                btn.disabled = true;
+
+                // 딜레이를 주어 실제 AI 추론 시간 모사
+                setTimeout(() => {
+                    processMessage(SCENARIOS[scenarioIndex]);
+                    scenarioIndex++;
+                    document.getElementById('step-count').innerText = `${scenarioIndex}/${SCENARIOS.length}`;
+                    
+                    if(scenarioIndex < SCENARIOS.length) {
+                        btn.innerHTML = `<i class="fa-solid fa-bolt"></i> 시나리오 계속 진행 (<span id="step-count">${scenarioIndex}/${SCENARIOS.length}</span>)`;
+                    } else {
+                        btn.innerHTML = `<i class="fa-solid fa-flag-checkered"></i> 시나리오 종료`;
+                        btn.classList.replace('bg-indigo-600', 'bg-slate-600');
+                    }
+                    btn.disabled = false;
+                }, 800);
+            } else {
+                alert("기본 10단계 시나리오가 모두 종료되었습니다. 우측 텍스트창에 직접 신고 내용을 입력해보세요.");
+            }
+        }
+
+        // 직접 입력 버튼 이벤트
+        function sendCustomMessage() {
+            const input = document.getElementById('custom-input');
+            const text = input.value.trim();
+            if (text) {
+                processMessage(text);
+                input.value = '';
+            }
+        }
+
+        // 초기화 버튼
+        function resetSimulation() {
+            scenarioIndex = 0;
+            riskHistory = [];
+            
+            document.getElementById('chat-container').innerHTML = `
+                <div class="h-full flex flex-col items-center justify-center text-slate-500 gap-3">
+                    <div class="w-20 h-20 rounded-full bg-slate-800 flex items-center justify-center mb-2 border border-slate-700">
+                        <i class="fa-solid fa-robot text-4xl opacity-50 text-blue-400"></i>
+                    </div>
+                    <p class="font-medium text-slate-400">10단계 다이나믹 시나리오 대기 중</p>
+                    <p class="text-sm opacity-60">하단의 '시나리오 테스트' 버튼을 눌러 진행하세요.</p>
+                </div>
+            `;
+            
+            // 게이지 초기화
+            document.getElementById('gauge-value').style.strokeDashoffset = 251.2;
+            document.getElementById('gauge-needle').style.transform = 'rotate(-90deg)';
+            document.getElementById('risk-display').innerHTML = `0 <span class="text-2xl text-slate-500 font-normal">/ 10</span>`;
+            document.getElementById('risk-display').style.color = '#ffffff';
+            document.getElementById('prob-display').innerText = `임베딩 확률: p=0.00`;
+            
+            // 상태 초기화
+            const statusEl = document.getElementById('status-display');
+            statusEl.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin mr-2 opacity-50"></i>대기 중`;
+            statusEl.style.color = '#94a3b8';
+            statusEl.style.borderColor = '#334155';
+            statusEl.style.backgroundColor = '#1e293b';
+            
+            // 버튼 초기화
+            const btn = document.getElementById('sim-btn');
+            btn.innerHTML = `<i class="fa-solid fa-bolt"></i> 시나리오 테스트 (<span id="step-count">0/10</span>)`;
+            btn.classList.replace('bg-slate-600', 'bg-indigo-600');
+            
+            // 차트 초기화
+            chartInstance.data.labels = [];
+            chartInstance.data.datasets[0].data = [];
+            chartInstance.update();
+        }
+
+        // 우측 상단 시계 업데이트
+        setInterval(() => {
+            const now = new Date();
+            document.getElementById('current-time').innerText = now.toLocaleDateString() + ' ' + now.toLocaleTimeString();
+        }, 1000);
+        
+        window.onload = () => {
+            initChart();
+        };
+
+    </script>
+</body>
+</html>
