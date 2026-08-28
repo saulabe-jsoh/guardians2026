@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>가디언즈(Gardians) 실시간 위험도 모니터링</title>
+    <!-- ONNX Runtime Web 라이브러리 로드 -->
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+    <style>
+        body { font-family: 'Malgun Gothic', sans-serif; background-color: #f1f3f5; margin: 0; padding: 20px; color: #343a40; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .header h1 { margin: 0 0 8px 0; color: #212529; font-size: 26px; }
+        .header p { margin: 0; color: #868e96; font-size: 14px; }
+        
+        .upload-section { max-width: 1200px; margin: 0 auto 20px auto; background: #fff; padding: 18px; border-radius: 12px; text-align: center; border: 2px dashed #4dabf7; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+        .upload-section label { font-weight: bold; margin-right: 12px; font-size: 15px; color: #1c7ed6; }
+        .upload-section input { font-size: 14px; padding: 8px 12px; cursor: pointer; border: 1px solid #ced4da; border-radius: 6px; }
+        .model-status { margin-top: 10px; font-size: 14px; font-weight: bold; color: #495057; }
+        
+        .dashboard { display: flex; max-width: 1200px; margin: 0 auto; gap: 20px; flex-wrap: wrap; }
+        
+        /* 왼쪽 패널 */
+        .left-panel { flex: 1; min-width: 350px; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.06); display: flex; flex-direction: column; }
+        .gauge-section { text-align: center; margin-bottom: 25px; padding: 20px; background: #f8f9fa; border-radius: 12px; border: 1px solid #e9ecef; }
+        .gauge-bg { width: 100%; height: 36px; background-color: #dee2e6; border-radius: 18px; overflow: hidden; margin: 15px 0; box-shadow: inset 0 2px 4px rgba(0,0,0,0.08); }
+        .gauge-fill { height: 100%; width: 0%; background-color: #51cf66; transition: width 0.5s ease-in-out, background-color 0.5s ease; }
+        .risk-text { font-size: 32px; font-weight: bold; color: #495057; }
+        .risk-badge { display: inline-block; padding: 6px 16px; border-radius: 20px; font-size: 15px; font-weight: bold; margin-top: 10px; color: white; background: #adb5bd; }
+
+        .preset-section h4 { color: #495057; margin-bottom: 10px; border-bottom: 2px solid #dee2e6; padding-bottom: 6px; font-size: 16px; }
+        .preset-select { width: 100%; padding: 12px; margin-bottom: 12px; border-radius: 8px; border: 1px solid #ced4da; font-size: 14px; outline: none; background-color: #fff; }
+        .preset-btn { display: block; width: 100%; padding: 13px; background: #20c997; color: white; border: none; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+        .preset-btn:hover:not(:disabled) { background: #12b886; }
+        .preset-btn:disabled { background: #adb5bd; cursor: not-allowed; }
+
+        /* 오른쪽 패널 */
+        .right-panel { flex: 2; min-width: 420px; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.06); display: flex; flex-direction: column; height: 620px; }
+        .right-panel h3 { margin: 0 0 12px 0; border-bottom: 2px solid #dee2e6; padding-bottom: 10px; font-size: 18px; color: #343a40; }
+        .log-container { flex: 1; overflow-y: auto; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 16px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 12px; }
+        
+        .log-item { display: flex; flex-direction: column; max-width: 82%; }
+        .log-item.user { align-self: flex-end; }
+        .log-item.system { align-self: flex-start; max-width: 90%; }
+        
+        .bubble { padding: 12px 16px; border-radius: 14px; font-size: 14px; line-height: 1.5; word-break: break-all; }
+        .bubble.user { background: #339af0; color: white; border-bottom-right-radius: 2px; }
+        .bubble.system { background: white; border: 1px solid #dee2e6; border-bottom-left-radius: 2px; color: #343a40; box-shadow: 0 2px 4px rgba(0,0,0,0.04); }
+        .bubble.system.error { color: #f03e3e; border-color: #ffc9c9; background-color: #fff5f5; }
+        
+        .log-meta { font-size: 11px; color: #868e96; margin-top: 4px; text-align: right; }
+        .log-item.system .log-meta { text-align: left; }
+
+        .input-area { display: flex; gap: 10px; }
+        .input-area input { flex: 1; padding: 14px; border: 1px solid #ced4da; border-radius: 8px; font-size: 14px; outline: none; }
+        .input-area input:disabled { background-color: #e9ecef; }
+        .input-area button { padding: 0 24px; background: #343a40; color: white; border: none; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+        .input-area button:hover:not(:disabled) { background: #212529; }
+        .input-area button:disabled { background: #adb5bd; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚨 가디언즈(Gardians) 실시간 위험도 모니터링</h1>
+        <p>웹 브라우저 내부에서 gardians_model.onnx 파일을 직접 로드하여 추론을 실행합니다.</p>
+    </div>
+
+    <!-- ONNX 모델 파일 업로드 영역 -->
+    <div class="upload-section">
+        <label for="modelUpload">📂 로컬 ONNX 모델 선택:</label>
+        <input type="file" id="modelUpload" accept=".onnx">
+        <div id="modelStatus" class="model-status">상단의 버튼을 눌러 <b>gardians_model.onnx</b> 파일을 선택해주세요.</div>
+    </div>
+
+    <div class="dashboard">
+        <!-- 왼쪽 패널 -->
+        <div class="left-panel">
+            <div class="gauge-section">
+                <h3 style="margin: 0; color: #495057; font-size: 17px;">예측 위험도 (Risk Score)</h3>
+                <div class="gauge-bg">
+                    <div id="gaugeFill" class="gauge-fill"></div>
+                </div>
+                <div id="riskText" class="risk-text">0.0</div>
+                <div id="riskBadge" class="risk-badge">모델 로드 대기</div>
+            </div>
+
+            <div class="preset-section">
+                <h4>테스트 시나리오 선택 (100건)</h4>
+                <select id="scenarioSelect" class="preset-select" disabled>
+                    <option value="">-- 모델 로드 후 활성화됩니다 --</option>
+                </select>
+                <button class="preset-btn" id="btnPreset" onclick="sendSelected()" disabled>선택한 시나리오 분석하기</button>
+            </div>
+        </div>
+
+        <!-- 오른쪽 패널 -->
+        <div class="right-panel">
+            <h3>상황 로그 및 실시간 분석 (Chat Log)</h3>
+            <div class="log-container" id="logContainer">
+                <div class="log-item system">
+                    <div class="bubble system">✅ <b>gardians_model.onnx</b> 파일을 업로드하면 텍스트 입력창과 100건의 시나리오가 활성화됩니다.</div>
+                </div>
+            </div>
+            
+            <div class="input-area">
+                <input type="text" id="chatInput" placeholder="신고 텍스트나 대화 내용을 입력하세요..." onkeypress="handleKeyPress(event)" disabled>
+                <button id="btnSend" onclick="sendManualText()" disabled>전송</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let session = null;
+
+        // 100건 시나리오 데이터셋 (Zero Risk 10건, Low Risk 30건, Mid Risk 30건, High Risk 30건)
+        const scenarios = [
+            // Zero Risk (10건)
+            { text: "오늘 저녁 메뉴는 김치찌개로 할까 생각 중이야.", group: "🟢 [Zero Risk: 일상 대화]" },
+            { text: "내일 비가 온다니까 출근할 때 우산 꼭 챙겨가.", group: "🟢 [Zero Risk: 일상 대화]" },
+            { text: "주말에 가족들이랑 제주도 여행 가기로 예약했어.", group: "🟢 [Zero Risk: 일상 대화]" },
+            { text: "새로 나온 영화 재미있다고 하던데 이번 주에 보러 갈래?", group: "🟢 [Zero Risk: 일상 대화]" },
+            { text: "강아지 사료가 다 떨어져서 내일 마트에 사러 가야 해.", group: "🟢 [Zero Risk: 일상 대화]" },
+            { text: "오늘 회사에서 회식이 있어서 조금 늦게 들어갈 것 같아.", group: "🟢 [Zero Risk: 일상 대화]" },
+            { text: "세탁소에 맡긴 겨울 코트 언제 찾으러 가야 하는지 알아?", group: "🟢 [Zero Risk: 일상 대화]" },
+            { text: "인터넷 쇼핑몰에서 주문한 택배가 벌써 도착했네.", group: "🟢 [Zero Risk: 일상 대화]" },
+            { text: "요즘 날씨가 너무 더워서 에어컨을 안 틀 수가 없네.", group: "🟢 [Zero Risk: 일상 대화]" },
+            { text: "아까 마트에서 장보다가 우연히 고등학교 동창을 만났어.", group: "🟢 [Zero Risk: 일상 대화]" },
+
+            // Low Risk (30건)
+            { text: "이웃 간의 소음 문제로 층간소음 갈등이 있습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
+            { text: "사소한 말다툼이 있었어요. 별다른 특이사항은 없습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
+            { text: "친구가 저에게 과도하게 연락을 하고 선물을 보냅니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
+            { text: "헤어진 연인이 잘 지내냐고 문자를 보냈습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
+            { text: "술에 취한 행인과 길에서 가벼운 시비가 붙었습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
+            { text: "주차 문제로 이웃과 말다툼을 했습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
+            { text: "전화로 욕설을 하며 시비를 거는 사람이 있습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
+            { text: "중고거래 중 판매자와 문자로 다퉜습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
+            { text: "층간소음 갈등으로 윗집 사람이 연락을 해왔습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
+            { text: "동네 친구와 사소한 오해로 갈등이 생겼습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
+            { text: "동거남과 가벼운 말다툼을 하고 집을 나왔습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
+            { text: "아내가 화가 나서 친정으로 가버렸습니다. 단순 말다툼입니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
+            { text: "남편이 술 먹고 늦게 와서 말다툼을 했습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
+            { text: "지인이 돈을 갚지 않아 문자로 다투었습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
+            { text: "모르는 번호로 자꾸 전화가 오는데 스팸 같습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
+            { text: "옆집 개 짖는 소리 때문에 시비가 붙었습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
+            { text: "전여친이 페이스북 메시지로 연락을 시도합니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
+            { text: "단순한 오해로 지인과 갈등이 빚어졌습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
+            { text: "식당에서 다른 손님과 자리 문제로 말다툼이 있었습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
+            { text: "층간소음 때문에 관리사무소에 연락했습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
+            { text: "친구끼리 술자리에서 시비가 붙었습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
+            { text: "택시기사와 요금 문제로 말다툼을 했습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
+            { text: "전화로 계속 상품 가입을 권유하는 연락이 옵니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
+            { text: "헤어진 지 1년 된 전남친이 갑자기 선물을 보냈어요.", group: "🟡 [Low Risk: 단순 시비/연락]" },
+            { text: "오랫동안 알고 지낸 동네 형과 말다툼을 했습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
+            { text: "길거리에서 어깨를 부딪혀 시비가 붙었습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
+            { text: "층간소음 문제로 아래층에서 올라와 다투었습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
+            { text: "지인과 약속 시간 문제로 말다툼을 했습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
+            { text: "단순한 말다툼이라 경찰 출동은 필요 없습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
+            { text: "전화로 화를 내긴 했지만 폭력 사태는 없었습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
+
+            // Mid Risk (30건)
+            { text: "최근 낯선 사람이 계속 집 주변을 맴돕니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
+            { text: "오랫동안 헤어진 연인이 지속적으로 연락을 시도하고 찾아옵니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
+            { text: "누군가 제 뒤를 미행하는 것 같아 불안합니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
+            { text: "전남친이 안 만나주면 회사로 찾아오겠다고 협박합니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
+            { text: "모르는 번호로 지속적인 스토킹 문자가 오고 있습니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
+            { text: "퇴근길에 낯선 남자가 계속 쫓아오는 느낌이 듭니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
+            { text: "헤어진 여자친구가 매일 집앞에서 기다리고 있습니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
+            { text: "누군가 제 차량 주변을 계속 배회하고 있습니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
+            { text: "스토킹 가해자가 또다시 제 SNS를 염탐하고 연락을 시도합니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
+            { text: "전남편이 이혼 후에도 지속적으로 찾아오고 있습니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
+            { text: "집앞에 모르는 사람이 1시간째 서성이고 있습니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
+            { text: "매일 같은 시간에 누군가 저를 미행하는 것 같습니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
+            { text: "지속적인 스토킹 때문에 정신적으로 스트레스가 심합니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
+            { text: "원치 않는 연락을 계속하며 집앞까지 찾아왔습니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
+            { text: "전남친이 제가 만나는 사람을 몰래 미행하고 있습니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
+            { text: "협박성 문자를 지속적으로 보내며 괴롭히고 있습니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
+            { text: "집 주변을 배회하는 수상한 사람 때문에 불안합니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
+            { text: "모르는 사람이 계속 집앞에 서서 저를 지켜봅니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
+            { text: "스토킹으로 신고했던 가해자가 다시 주변을 맴돕니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
+            { text: "퇴근길에 계속 누군가 쫓아와서 뛰어서 도망쳤습니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
+            { text: "전여친이 수십 통의 부재중 전화와 협박 문자를 남겼습니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
+            { text: "밤마다 누군가 창문 밖을 서성이는 것 같아 찝찝합니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
+            { text: "헤어진 지 3개월 된 남친이 계속 찾아오고 있습니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
+            { text: "스토킹 고소 중인데 가해자가 계속 연락을 해옵니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
+            { text: "모르는 사람이 우편물과 선물을 집앞에 계속 두고 갑니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
+            { text: "지속적인 괴롭힘과 미행으로 인해 고통받고 있습니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
+            { text: "집 근처에서 저를 기다리고 있다가 갑자기 나타났습니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
+            { text: "거부 의사를 밝혔음에도 계속해서 쫓아옵니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
+            { text: "매일 발신번호 표시제한으로 전화가 와서 무시하고 있습니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
+            { text: "전남친이 제 동선과 일정을 모두 파악하고 미행합니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
+
+            // High Risk (30건)
+            { text: "전남친이 칼을 들고 집 앞에 찾아와서 죽이겠다고 협박해요. 살려주세요!", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
+            { text: "스토킹 피해를 당하고 있어요. 너무 불안하고 무섭습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
+            { text: "모르는 사람이 창문을 깨고 침입하려고 합니다. 무섭습니다!", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
+            { text: "전남편이 흉기를 들고 찾아와서 가족들을 다 죽이겠다고 합니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
+            { text: "스토킹 가해자가 칼을 들고 길에서 저를 위협하고 있습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
+            { text: "낯선 남자가 저를 납치하려고 차에 강제로 태우려 했습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
+            { text: "집 안에 누군가 침입한 것 같아요. 너무 무서워서 숨어있습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
+            { text: "칼을 든 사람이 저를 쫓아옵니다. 무섭습니다, 빨리 와주세요!", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
+            { text: "동거남이 저를 방에 감금하고 폭행하고 있습니다. 살려주세요.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
+            { text: "헤어진 남친이 집 문을 부수고 침입해서 목을 졸랐습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
+            { text: "스토킹 가해자가 염산을 들고 찾아오겠다고 위협했습니다. 두렵습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
+            { text: "모르는 사람이 흉기로 저를 찌르려고 쫓아오고 있습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
+            { text: "전남친이 저를 차에 감금하고 어디론가 끌고 가고 있습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
+            { text: "무기를 든 남자가 아파트 복도에서 저를 기다리고 있습니다. 무서워요.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
+            { text: "스토커가 제 집에 몰래 침입해서 숨어있다가 칼을 꺼냈습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
+            { text: "전여친이 흉기를 들고 회사에 찾아와서 죽이겠다고 난동을 부립니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
+            { text: "살려주세요! 낯선 사람이 집 문을 강제로 열고 침입했습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
+            { text: "누군가 제 목을 조르고 폭행했습니다. 피를 많이 흘리고 있어요.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
+            { text: "스토킹 하던 사람이 저를 옥상으로 끌고 가 밀어버리려 합니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
+            { text: "가해자가 칼을 들이대고 소리지르면 죽이겠다고 협박합니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
+            { text: "집에 강도가 침입해서 칼로 가족들을 위협하고 있습니다. 무섭습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
+            { text: "전남편이 찾아와서 불을 지르겠다고 위협하고 있습니다. 두렵습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
+            { text: "납치를 당할 뻔했습니다. 간신히 도망쳤는데 계속 쫓아옵니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
+            { text: "흉기를 든 남자가 편의점에 침입해 점원을 인질로 잡고 있습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
+            { text: "스토커가 제 아이를 납치하겠다고 협박 전화를 했습니다. 무섭습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
+            { text: "살해 위협을 받고 있습니다. 지금 집앞에 흉기를 들고 서있습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
+            { text: "가해자가 저를 폭행하고 핸드폰을 빼앗아 감금했습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
+            { text: "집에 누군가 침입해서 칼로 저를 위협하며 돈을 요구합니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
+            { text: "전남친이 식칼을 들고 쫓아오고 있어요. 너무 두렵습니다, 살려주세요!", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
+            { text: "낯선 남자가 엘리베이터에 같이 타서 흉기를 꺼내들었습니다. 무섭습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" }
+        ];
+
+        // ONNX 모델 파일 업로드 핸들러
+        document.getElementById('modelUpload').addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const statusEl = document.getElementById('modelStatus');
+            statusEl.innerHTML = `⏳ <b>${file.name}</b> 로드 및 초기화 중...`;
+            appendLog(`⏳ '${file.name}' 파일을 브라우저 메모리로 로드하고 있습니다...`, 'system');
+
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                
+                // ORT Web 세션 생성
+                session = await ort.InferenceSession.create(arrayBuffer);
+                
+                statusEl.innerHTML = `✅ <b>${file.name}</b> 로드 완료! (입력: ${session.inputNames.join(', ')} / 출력: ${session.outputNames.join(', ')})`;
+                statusEl.style.color = "#2b8a3e";
+                appendLog(`✅ <b>${file.name}</b> 모델 로드 성공! 이제 실시간 분석이 가능합니다.`, 'system');
+
+                // UI 컨트롤 활성화
+                initDropdown();
+                document.getElementById('scenarioSelect').disabled = false;
+                document.getElementById('btnPreset').disabled = false;
+                document.getElementById('chatInput').disabled = false;
+                document.getElementById('btnSend').disabled = false;
+                document.getElementById('riskBadge').innerText = '준비 완료';
+
+            } catch (err) {
+                statusEl.innerHTML = `❌ 모델 로드 실패: ${err.message}`;
+                statusEl.style.color = "#e03131";
+                appendLog(`❌ 모델 로드 실패: ${err.message}`, 'system error');
+            }
+        });
+
+        // 100건 드롭다운 세팅
+        function initDropdown() {
+            const selectEl = document.getElementById("scenarioSelect");
+            selectEl.innerHTML = "";
+            let currentGroup = "";
+            let optgroup = null;
+
+            scenarios.forEach((s, idx) => {
+                if (s.group !== currentGroup) {
+                    currentGroup = s.group;
+                    optgroup = document.createElement("optgroup");
+                    optgroup.label = currentGroup;
+                    selectEl.appendChild(optgroup);
+                }
+                const option = document.createElement("option");
+                option.value = s.text;
+                let shortText = s.text.length > 35 ? s.text.substring(0, 35) + "..." : s.text;
+                option.text = `[${idx+1}] ` + shortText;
+                optgroup.appendChild(option);
+            });
+        }
+
+        function sendSelected() {
+            const selectEl = document.getElementById("scenarioSelect");
+            if (selectEl.value) sendText(selectEl.value);
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') sendManualText();
+        }
+
+        function sendManualText() {
+            const inputEl = document.getElementById('chatInput');
+            const text = inputEl.value.trim();
+            if (text) {
+                sendText(text);
+                inputEl.value = '';
+            }
+        }
+
+        // 브라우저 내부 ONNX 추론 실행 함수
+        async function sendText(text) {
+            if (!session) {
+                alert("먼저 ONNX 모델 파일을 업로드해주세요.");
+                return;
+            }
+
+            appendLog(text, 'user');
+            
+            try {
+                // String Tensor 생성 (sklearn 파이프라인 대응: [1, 1] shape)
+                const tensor = new ort.Tensor('string', [text], [1, 1]);
+                const inputName = session.inputNames[0];
+                const feeds = {};
+                feeds[inputName] = tensor;
+                
+                // 모델 추론
+                const results = await session.run(feeds);
+                
+                let raw_score = 0.0;
+                
+                if (session.outputNames.length > 1) {
+                    // 분류(Classifier) 모델 구조인 경우 (두 번째 노드에서 확률 배열 반환)
+                    const probName = session.outputNames[1];
+                    const probs = results[probName].data;
+                    raw_score = (probs[0] * 0.1) + (probs[1] * 0.6) + (probs[2] * 0.9);
+                } else {
+                    // 회귀(Regressor) 모델 구조인 경우
+                    const outputName = session.outputNames[0];
+                    raw_score = results[outputName].data[0];
+                }
+
+                // 점수 보정 및 레벨 계산 (0.0 ~ 1.0)
+                let risk_score = Math.min(1.0, Math.max(0.0, Math.round(raw_score * 10) / 10));
+                let level = Math.floor(risk_score * 10);
+                
+                // 대시보드 게이지 업데이트
+                updateDashboard(risk_score, level);
+                
+                // 결과 로깅
+                let emoji = '🟢';
+                if (level >= 8) emoji = '🔴';
+                else if (level >= 5) emoji = '🟡';
+                
+                appendLog(`${emoji} [분석 완료] 예측 위험도: ${risk_score.toFixed(1)} (Level ${level} / 10)`, 'system');
+
+            } catch (err) {
+                console.error(err);
+                appendLog(`분석 중 오류 발생: ${err.message}`, 'system error');
+            }
+        }
+
+        function appendLog(text, sender) {
+            const container = document.getElementById('logContainer');
+            const timeStr = new Date().toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            
+            const itemDiv = document.createElement('div');
+            itemDiv.className = `log-item ${sender.replace(' error', '')}`;
+            
+            const bubbleDiv = document.createElement('div');
+            bubbleDiv.className = `bubble ${sender}`;
+            bubbleDiv.innerHTML = text;
+            
+            const metaDiv = document.createElement('div');
+            metaDiv.className = 'log-meta';
+            metaDiv.innerText = sender === 'user' ? `접수 내용 • ${timeStr}` : `AI 분석 • ${timeStr}`;
+            
+            itemDiv.appendChild(bubbleDiv);
+            itemDiv.appendChild(metaDiv);
+            container.appendChild(itemDiv);
+            
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function updateDashboard(risk_score, level) {
+            const gaugeFill = document.getElementById('gaugeFill');
+            const riskText = document.getElementById('riskText');
+            const riskBadge = document.getElementById('riskBadge');
+            
+            const percentage = risk_score * 100;
+            gaugeFill.style.width = percentage + '%';
+            
+            let color = '#51cf66';
+            let badgeText = '일반 / 안전 (자체종결)';
+            
+            if (level >= 8) {
+                color = '#ff6b6b';
+                badgeText = '긴급 / 심각 (즉각 출동)';
+            } else if (level >= 5) {
+                color = '#fcc419';
+                badgeText = '위험 / 경계 (주시 필요)';
+            }
+            
+            gaugeFill.style.backgroundColor = color;
+            riskBadge.style.backgroundColor = color;
+            riskBadge.innerText = badgeText;
+            riskText.innerText = risk_score.toFixed(1);
+            riskText.style.color = color;
+        }
+    </script>
+</body>
+</html>
