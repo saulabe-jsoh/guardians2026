@@ -3,110 +3,244 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>가디언즈(Gardians) 실시간 위험도 모니터링 (Web-only)</title>
-    <!-- ONNX Runtime Web 라이브러리 로드 -->
+    <title>가디언즈(Gardians) 실시간 위험도 모니터링</title>
+    <!-- ONNX Runtime Web 라이브러리 -->
     <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+    <!-- Chart.js 라이브러리 (누적 추이 그래프용) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: 'Malgun Gothic', sans-serif; background-color: #e9ecef; margin: 0; padding: 20px; }
-        .header { text-align: center; margin-bottom: 20px; color: #343a40; }
-        .upload-section { max-width: 1200px; margin: 0 auto 20px auto; background: #fff3cd; padding: 15px; border-radius: 8px; text-align: center; border: 2px dashed #ffe066; }
-        .upload-section input { font-size: 16px; padding: 10px; cursor: pointer; }
+        body { font-family: 'Malgun Gothic', sans-serif; background-color: #f1f3f5; margin: 0; padding: 20px; color: #343a40; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .header h1 { margin: 0 0 8px 0; color: #212529; font-size: 26px; }
+        .header p { margin: 0; color: #868e96; font-size: 14px; }
         
-        .dashboard { display: flex; max-width: 1200px; margin: 0 auto; gap: 20px; flex-wrap: wrap; }
+        .upload-section { max-width: 1250px; margin: 0 auto 20px auto; background: #fff; padding: 16px; border-radius: 12px; text-align: center; border: 2px dashed #4dabf7; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+        .upload-section label { font-weight: bold; margin-right: 12px; font-size: 15px; color: #1c7ed6; }
+        .upload-section input { font-size: 14px; padding: 8px 12px; cursor: pointer; border: 1px solid #ced4da; border-radius: 6px; }
+        .model-status { margin-top: 10px; font-size: 14px; font-weight: bold; color: #495057; }
         
-        /* 왼쪽 패널: 계기판 및 예시 문장 */
-        .left-panel { flex: 1; min-width: 350px; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
-        .gauge-section { text-align: center; margin-bottom: 30px; padding: 20px; background: #f8f9fa; border-radius: 12px; }
-        .gauge-bg { width: 100%; height: 40px; background-color: #dee2e6; border-radius: 20px; overflow: hidden; margin: 15px 0; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1); }
-        .gauge-fill { height: 100%; width: 0%; background-color: #51cf66; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.6s ease; }
-        .risk-text { font-size: 28px; font-weight: bold; color: #495057; }
-        .risk-badge { display: inline-block; padding: 5px 15px; border-radius: 20px; font-size: 16px; font-weight: bold; margin-top: 10px; color: white; background: #adb5bd; }
+        .dashboard { display: grid; grid-template-columns: 380px 1fr; max-width: 1250px; margin: 0 auto; gap: 20px; }
+        @media (max-width: 900px) { .dashboard { grid-template-columns: 1fr; } }
+        
+        /* 왼쪽 패널: 계기판 및 컨트롤 */
+        .left-panel { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.06); display: flex; flex-direction: column; gap: 15px; }
+        
+        /* 반원형 계기판 스타일 */
+        .gauge-section { text-align: center; padding: 15px 10px; background: #f8f9fa; border-radius: 12px; border: 1px solid #e9ecef; position: relative; }
+        .gauge-title { margin: 0 0 10px 0; color: #495057; font-size: 16px; font-weight: bold; }
+        .gauge-container { position: relative; width: 280px; height: 145px; margin: 0 auto; overflow: hidden; }
+        .gauge-svg { width: 280px; height: 280px; transform: rotate(-90deg); }
+        .gauge-track { fill: none; stroke: #e9ecef; stroke-width: 24; }
+        .gauge-arc-green { fill: none; stroke: #51cf66; stroke-width: 24; stroke-dasharray: 176 440; stroke-dashoffset: 0; }
+        .gauge-arc-yellow { fill: none; stroke: #fcc419; stroke-width: 24; stroke-dasharray: 132 440; stroke-dashoffset: -176; }
+        .gauge-arc-red { fill: none; stroke: #ff6b6b; stroke-width: 24; stroke-dasharray: 132 440; stroke-dashoffset: -308; }
+        
+        /* 바늘(Needle) */
+        .needle-pivot { position: absolute; bottom: 0; left: 140px; width: 0; height: 0; }
+        .needle {
+            position: absolute;
+            bottom: 0;
+            left: -3px;
+            width: 6px;
+            height: 115px;
+            background: linear-gradient(to top, #212529 10%, #fa5252 90%);
+            border-radius: 3px 3px 0 0;
+            transform-origin: 3px 115px;
+            transform: rotate(-90deg);
+            transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+        .needle-center-cap {
+            position: absolute;
+            bottom: -10px;
+            left: -10px;
+            width: 20px;
+            height: 20px;
+            background: #212529;
+            border: 3px solid #fff;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            z-index: 10;
+        }
 
-        .preset-section h4 { color: #495057; margin-bottom: 10px; border-bottom: 2px solid #dee2e6; padding-bottom: 5px; }
-        .preset-select { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #ced4da; font-size: 14px; outline: none; }
-        .preset-btn { display: block; width: 100%; padding: 12px; background: #20c997; color: white; border: none; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
-        .preset-btn:hover { background: #12b886; }
+        .gauge-scale-labels { display: flex; justify-content: space-between; width: 260px; margin: 0 auto; font-size: 12px; font-weight: bold; color: #868e96; }
+        .risk-value-display { margin-top: 8px; font-size: 30px; font-weight: 800; color: #495057; }
+        .risk-badge { display: inline-block; padding: 5px 14px; border-radius: 20px; font-size: 13px; font-weight: bold; color: white; background: #adb5bd; }
+
+        .preset-section h4, .auto-section h4 { color: #495057; margin: 0 0 8px 0; border-bottom: 2px solid #dee2e6; padding-bottom: 5px; font-size: 15px; }
+        .preset-select { width: 100%; padding: 10px; margin-bottom: 8px; border-radius: 8px; border: 1px solid #ced4da; font-size: 13px; outline: none; background-color: #fff; box-sizing: border-box; }
+        
+        .btn-group { display: flex; gap: 8px; margin-bottom: 10px; }
+        .preset-btn { flex: 1; padding: 10px; background: #20c997; color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+        .preset-btn:hover:not(:disabled) { background: #12b886; }
         .preset-btn:disabled { background: #adb5bd; cursor: not-allowed; }
+        .btn-random-once { background: #fab005; }
+        .btn-random-once:hover:not(:disabled) { background: #f59f00; }
 
-        /* 오른쪽 패널: 챗팅/로그 누적 영역 */
-        .right-panel { flex: 2; min-width: 400px; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: flex; flex-direction: column; height: 600px; }
-        .log-container { flex: 1; overflow-y: auto; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 15px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; }
+        .auto-section { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 10px; padding: 12px; }
+        .auto-controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+        .auto-controls label { font-size: 13px; font-weight: bold; color: #495057; }
+        .interval-input { width: 65px; padding: 6px 8px; border: 1px solid #ced4da; border-radius: 6px; font-size: 13px; text-align: center; outline: none; }
         
-        .log-item { display: flex; flex-direction: column; max-width: 80%; }
+        .btn-auto-toggle { width: 100%; padding: 10px; background: #4dabf7; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+        .btn-auto-toggle:hover:not(:disabled) { background: #339af0; }
+        .btn-auto-toggle.running { background: #fa5252; }
+        .btn-auto-toggle.running:hover:not(:disabled) { background: #e03131; }
+        .btn-auto-toggle:disabled { background: #adb5bd; cursor: not-allowed; }
+
+        /* 오른쪽 패널: 누적 그래프 + 상황 로그 */
+        .right-panel { display: flex; flex-direction: column; gap: 20px; }
+        
+        /* 상단: 누적 위험도 추이 그래프 영역 */
+        .chart-card { background: white; padding: 18px 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.06); }
+        .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 2px solid #dee2e6; padding-bottom: 8px; }
+        .chart-header h3 { margin: 0; font-size: 17px; color: #343a40; }
+        .chart-stats { font-size: 13px; font-weight: bold; color: #495057; display: flex; gap: 15px; }
+        .chart-container { position: relative; width: 100%; height: 180px; }
+        .btn-clear-chart { padding: 4px 10px; font-size: 12px; background: #e9ecef; border: 1px solid #ced4da; border-radius: 5px; cursor: pointer; }
+        .btn-clear-chart:hover { background: #dee2e6; }
+
+        /* 하단: 상황 로그 영역 */
+        .chat-card { background: white; padding: 18px 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.06); display: flex; flex-direction: column; height: 380px; }
+        .chat-card h3 { margin: 0 0 10px 0; border-bottom: 2px solid #dee2e6; padding-bottom: 8px; font-size: 17px; color: #343a40; }
+        .log-container { flex: 1; overflow-y: auto; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 14px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px; }
+        
+        .log-item { display: flex; flex-direction: column; max-width: 82%; }
         .log-item.user { align-self: flex-end; }
         .log-item.system { align-self: flex-start; max-width: 90%; }
         
-        .bubble { padding: 12px 16px; border-radius: 15px; font-size: 15px; line-height: 1.4; word-break: break-all; }
+        .bubble { padding: 10px 14px; border-radius: 14px; font-size: 13.5px; line-height: 1.5; word-break: break-all; }
         .bubble.user { background: #339af0; color: white; border-bottom-right-radius: 2px; }
-        .bubble.system { background: white; border: 1px solid #ced4da; border-bottom-left-radius: 2px; color: #343a40; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .bubble.system.error { color: #f03e3e; border-color: #f03e3e; }
+        .bubble.system { background: white; border: 1px solid #dee2e6; border-bottom-left-radius: 2px; color: #343a40; box-shadow: 0 2px 4px rgba(0,0,0,0.04); }
+        .bubble.system.error { color: #f03e3e; border-color: #ffc9c9; background-color: #fff5f5; }
         
-        .log-meta { font-size: 12px; color: #868e96; margin-top: 4px; text-align: right; }
+        .log-meta { font-size: 11px; color: #868e96; margin-top: 4px; text-align: right; }
         .log-item.system .log-meta { text-align: left; }
 
         .input-area { display: flex; gap: 10px; }
-        .input-area input { flex: 1; padding: 15px; border: 1px solid #ced4da; border-radius: 8px; font-size: 15px; outline: none; }
+        .input-area input { flex: 1; padding: 12px; border: 1px solid #ced4da; border-radius: 8px; font-size: 14px; outline: none; }
         .input-area input:disabled { background-color: #e9ecef; }
-        .input-area button { padding: 0 25px; background: #343a40; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+        .input-area button { padding: 0 22px; background: #343a40; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+        .input-area button:hover:not(:disabled) { background: #212529; }
         .input-area button:disabled { background: #adb5bd; cursor: not-allowed; }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>🚨 가디언즈(Gardians) 상황 모니터링 데스크</h1>
-        <p style="color: #6c757d;">파이썬 서버 없이 브라우저에서 직접 ONNX 모델을 구동합니다.</p>
+        <h1>🚨 가디언즈(Gardians) 실시간 위험도 모니터링</h1>
+        <p>반원형 바늘 계기판과 실시간 누적 위험도 추이 분석 시스템 (Web Standalone)</p>
     </div>
 
-    <!-- 파일 업로드 영역 -->
+    <!-- ONNX 모델 파일 업로드 영역 -->
     <div class="upload-section">
-        <label for="modelUpload" style="font-weight: bold; margin-right: 10px;">📂 ONNX 모델 파일(gardians_model.onnx) 선택:</label>
+        <label for="modelUpload">📂 로컬 ONNX 모델 선택:</label>
         <input type="file" id="modelUpload" accept=".onnx">
+        <div id="modelStatus" class="model-status">상단의 버튼을 눌러 <b>gardians_model.onnx</b> 파일을 선택해주세요.</div>
     </div>
 
     <div class="dashboard">
-        <!-- 왼쪽: 계기판 및 예시 -->
+        <!-- 왼쪽 패널: 계기판 및 컨트롤 -->
         <div class="left-panel">
+            <!-- 반원형 바늘 계기판 -->
             <div class="gauge-section">
-                <h3 style="margin-top: 0; color: #343a40;">현재 위험도 (Current Risk)</h3>
-                <div class="gauge-bg">
-                    <div id="gaugeFill" class="gauge-fill"></div>
+                <div class="gauge-title">실시간 위험도 계기판</div>
+                <div class="gauge-container">
+                    <svg class="gauge-svg" viewBox="0 0 280 280">
+                        <circle class="gauge-track" cx="140" cy="140" r="110" />
+                        <!-- 초록 (0~0.4: 40%), 노랑 (0.4~0.7: 30%), 빨강 (0.7~1.0: 30%) -->
+                        <circle class="gauge-arc-green" cx="140" cy="140" r="110" />
+                        <circle class="gauge-arc-yellow" cx="140" cy="140" r="110" />
+                        <circle class="gauge-arc-red" cx="140" cy="140" r="110" />
+                    </svg>
+                    <div class="needle-pivot">
+                        <div id="gaugeNeedle" class="needle"></div>
+                        <div class="needle-center-cap"></div>
+                    </div>
                 </div>
-                <div id="riskText" class="risk-text">0.0</div>
-                <div id="riskBadge" class="risk-badge">대기 중</div>
+                <div class="gauge-scale-labels">
+                    <span>0.0 (안전)</span>
+                    <span>0.5 (경계)</span>
+                    <span>1.0 (긴급)</span>
+                </div>
+                <div id="riskText" class="risk-value-display">0.0</div>
+                <div id="riskBadge" class="risk-badge">모델 로드 대기</div>
             </div>
 
+            <!-- 수동/개별 선택 섹션 -->
             <div class="preset-section">
-                <h4>테스트 시나리오 선택 (110건)</h4>
+                <h4>테스트 시나리오 선택 (100건)</h4>
                 <select id="scenarioSelect" class="preset-select" disabled>
-                    <option value="">-- 모델을 먼저 업로드해주세요 --</option>
+                    <option value="">-- 모델 로드 후 활성화됩니다 --</option>
                 </select>
-                <button class="preset-btn" id="btnPreset" onclick="sendSelected()" disabled>선택한 시나리오 분석하기</button>
+                <div class="btn-group">
+                    <button class="preset-btn" id="btnPreset" onclick="sendSelected()" disabled>선택 분석</button>
+                    <button class="preset-btn btn-random-once" id="btnRandomOnce" onclick="sendRandomOnce()" disabled>🎲 랜덤 1건 분석</button>
+                </div>
+            </div>
+
+            <!-- 자동 시뮬레이션 섹션 -->
+            <div class="auto-section">
+                <h4>자동 시뮬레이션 (랜덤 재생)</h4>
+                <div class="auto-controls">
+                    <label for="intervalInput">⏱️ 전송 주기 (초):</label>
+                    <div>
+                        <input type="number" id="intervalInput" class="interval-input" value="3" min="0.5" max="60" step="0.5">
+                        <span style="font-size: 13px; color: #868e96;">초</span>
+                    </div>
+                </div>
+                <button class="btn-auto-toggle" id="btnAutoToggle" onclick="toggleAutoSimulation()" disabled>▶️ 자동 랜덤 입력 시작</button>
             </div>
         </div>
 
-        <!-- 오른쪽: 챗팅/상황 로그 -->
+        <!-- 오른쪽 패널: 누적 그래프 + 상황 로그 -->
         <div class="right-panel">
-            <h3 style="margin-top: 0; color: #343a40; border-bottom: 2px solid #dee2e6; padding-bottom: 10px;">상황 로그 (Chat Log)</h3>
-            <div class="log-container" id="logContainer">
-                <div class="log-item system">
-                    <div class="bubble system">✅ 상단의 파일 선택 버튼을 눌러 <b>gardians_model.onnx</b> 파일을 업로드해주세요.</div>
+            <!-- 상단: 누적 위험도 추이 그래프 -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h3>📈 누적 위험도 시계열 추이 (Timeline Trend)</h3>
+                    <div class="chart-stats">
+                        <span>누적 건수: <b id="statTotalCount" style="color:#1c7ed6;">0</b>건</span>
+                        <span>평균 위험도: <b id="statAvgRisk" style="color:#e03131;">0.00</b></span>
+                        <button class="btn-clear-chart" onclick="resetChart()">그래프 초기화</button>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="trendChart"></canvas>
                 </div>
             </div>
-            
-            <div class="input-area">
-                <input type="text" id="chatInput" placeholder="신고 접수 내용이나 대화를 직접 입력하세요..." onkeypress="handleKeyPress(event)" disabled>
-                <button id="btnSend" onclick="sendManualText()" disabled>전송</button>
+
+            <!-- 하단: 상황 로그 -->
+            <div class="chat-card">
+                <h3>상황 로그 및 실시간 분석 (Chat Log)</h3>
+                <div class="log-container" id="logContainer">
+                    <div class="log-item system">
+                        <div class="bubble system">✅ <b>gardians_model.onnx</b> 파일을 업로드하면 계기판과 누적 추이 그래프가 활성화됩니다.</div>
+                    </div>
+                </div>
+                
+                <div class="input-area">
+                    <input type="text" id="chatInput" placeholder="신고 텍스트나 대화 내용을 입력하세요..." onkeypress="handleKeyPress(event)" disabled>
+                    <button id="btnSend" onclick="sendManualText()" disabled>전송</button>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        // 전역 ONNX 세션 변수
         let session = null;
+        let autoIntervalId = null;
+        let trendChart = null;
 
-        // 110건의 시나리오 데이터
+        // 누적 데이터 저장소
+        const historyData = {
+            labels: [],
+            values: [],
+            colors: []
+        };
+
+        // 100건 시나리오 데이터셋
         const scenarios = [
-            // Zero Risk
+            // Zero Risk (10건)
             { text: "오늘 저녁 메뉴는 김치찌개로 할까 생각 중이야.", group: "🟢 [Zero Risk: 일상 대화]" },
             { text: "내일 비가 온다니까 출근할 때 우산 꼭 챙겨가.", group: "🟢 [Zero Risk: 일상 대화]" },
             { text: "주말에 가족들이랑 제주도 여행 가기로 예약했어.", group: "🟢 [Zero Risk: 일상 대화]" },
@@ -117,7 +251,8 @@
             { text: "인터넷 쇼핑몰에서 주문한 택배가 벌써 도착했네.", group: "🟢 [Zero Risk: 일상 대화]" },
             { text: "요즘 날씨가 너무 더워서 에어컨을 안 틀 수가 없네.", group: "🟢 [Zero Risk: 일상 대화]" },
             { text: "아까 마트에서 장보다가 우연히 고등학교 동창을 만났어.", group: "🟢 [Zero Risk: 일상 대화]" },
-            // Low Risk
+
+            // Low Risk (30건)
             { text: "이웃 간의 소음 문제로 층간소음 갈등이 있습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
             { text: "사소한 말다툼이 있었어요. 별다른 특이사항은 없습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
             { text: "친구가 저에게 과도하게 연락을 하고 선물을 보냅니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
@@ -148,7 +283,8 @@
             { text: "지인과 약속 시간 문제로 말다툼을 했습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
             { text: "단순한 말다툼이라 경찰 출동은 필요 없습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
             { text: "전화로 화를 내긴 했지만 폭력 사태는 없었습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
-            // Mid Risk
+
+            // Mid Risk (30건)
             { text: "최근 낯선 사람이 계속 집 주변을 맴돕니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
             { text: "오랫동안 헤어진 연인이 지속적으로 연락을 시도하고 찾아옵니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
             { text: "누군가 제 뒤를 미행하는 것 같아 불안합니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
@@ -179,7 +315,8 @@
             { text: "거부 의사를 밝혔음에도 계속해서 쫓아옵니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
             { text: "매일 발신번호 표시제한으로 전화가 와서 무시하고 있습니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
             { text: "전남친이 제 동선과 일정을 모두 파악하고 미행합니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
-            // High Risk
+
+            // High Risk (30건)
             { text: "전남친이 칼을 들고 집 앞에 찾아와서 죽이겠다고 협박해요. 살려주세요!", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
             { text: "스토킹 피해를 당하고 있어요. 너무 불안하고 무섭습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
             { text: "모르는 사람이 창문을 깨고 침입하려고 합니다. 무섭습니다!", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
@@ -212,14 +349,113 @@
             { text: "낯선 남자가 엘리베이터에 같이 타서 흉기를 꺼내들었습니다. 무섭습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" }
         ];
 
-        // 페이지 로드 시 드롭다운 세팅
         window.onload = function() {
+            initChart();
+        };
+
+        // Chart.js 초기화
+        function initChart() {
+            const ctx = document.getElementById('trendChart').getContext('2d');
+            trendChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: historyData.labels,
+                    datasets: [{
+                        label: '위험도 (0.0~1.0)',
+                        data: historyData.values,
+                        borderColor: '#339af0',
+                        backgroundColor: 'rgba(51, 154, 240, 0.1)',
+                        borderWidth: 2,
+                        pointBackgroundColor: historyData.colors,
+                        pointBorderColor: '#fff',
+                        pointRadius: 5,
+                        pointHoverRadius: 7,
+                        tension: 0.3,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            min: 0,
+                            max: 1.0,
+                            ticks: { stepSize: 0.2, font: { weight: 'bold' } },
+                            grid: { color: '#f1f3f5' }
+                        },
+                        x: {
+                            grid: { display: false }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `위험도: ${context.parsed.y.toFixed(2)} (Level ${Math.floor(context.parsed.y * 10)})`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 그래프 초기화
+        function resetChart() {
+            historyData.labels = [];
+            historyData.values = [];
+            historyData.colors = [];
+            trendChart.data.labels = historyData.labels;
+            trendChart.data.datasets[0].data = historyData.values;
+            trendChart.data.datasets[0].pointBackgroundColor = historyData.colors;
+            trendChart.update();
+
+            document.getElementById('statTotalCount').innerText = '0';
+            document.getElementById('statAvgRisk').innerText = '0.00';
+            appendLog('📊 누적 위험도 추이 그래프가 초기화되었습니다.', 'system');
+        }
+
+        // ONNX 모델 파일 업로드 핸들러
+        document.getElementById('modelUpload').addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const statusEl = document.getElementById('modelStatus');
+            statusEl.innerHTML = `⏳ <b>${file.name}</b> 로드 및 초기화 중...`;
+            appendLog(`⏳ '${file.name}' 파일을 브라우저 메모리로 로드하고 있습니다...`, 'system');
+
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                session = await ort.InferenceSession.create(arrayBuffer);
+                
+                statusEl.innerHTML = `✅ <b>${file.name}</b> 로드 완료! (입력: ${session.inputNames.join(', ')} / 출력: ${session.outputNames.join(', ')})`;
+                statusEl.style.color = "#2b8a3e";
+                appendLog(`✅ <b>${file.name}</b> 모델 로드 성공! 반원형 계기판과 누적 추이 분석이 준비되었습니다.`, 'system');
+
+                initDropdown();
+                document.getElementById('scenarioSelect').disabled = false;
+                document.getElementById('btnPreset').disabled = false;
+                document.getElementById('btnRandomOnce').disabled = false;
+                document.getElementById('btnAutoToggle').disabled = false;
+                document.getElementById('chatInput').disabled = false;
+                document.getElementById('btnSend').disabled = false;
+                document.getElementById('riskBadge').innerText = '준비 완료';
+
+            } catch (err) {
+                statusEl.innerHTML = `❌ 모델 로드 실패: ${err.message}`;
+                statusEl.style.color = "#e03131";
+                appendLog(`❌ 모델 로드 실패: ${err.message}`, 'system error');
+            }
+        });
+
+        // 100건 드롭다운 세팅
+        function initDropdown() {
             const selectEl = document.getElementById("scenarioSelect");
+            selectEl.innerHTML = "";
             let currentGroup = "";
             let optgroup = null;
-            
-            // 옵션 모두 지우기
-            selectEl.innerHTML = "";
 
             scenarios.forEach((s, idx) => {
                 if (s.group !== currentGroup) {
@@ -234,38 +470,45 @@
                 option.text = `[${idx+1}] ` + shortText;
                 optgroup.appendChild(option);
             });
-        };
-
-        // 파일 업로드 처리: ONNX 파일 로드
-        document.getElementById('modelUpload').addEventListener('change', async (event) => {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            appendLog(`⏳ '${file.name}' 파일을 브라우저로 로드 중입니다...`, 'system');
-            
-            try {
-                // 파일을 ArrayBuffer로 읽기
-                const arrayBuffer = await file.arrayBuffer();
-                
-                // ORT Session 생성 (웹어셈블리 활용)
-                session = await ort.InferenceSession.create(arrayBuffer);
-                
-                appendLog(`✅ 모델 로드 성공! 이제 텍스트를 분석할 수 있습니다.`, 'system');
-                
-                // UI 활성화
-                document.getElementById('scenarioSelect').disabled = false;
-                document.getElementById('btnPreset').disabled = false;
-                document.getElementById('chatInput').disabled = false;
-                document.getElementById('btnSend').disabled = false;
-                
-            } catch (err) {
-                appendLog(`❌ 모델 로드 실패: ${err.message}`, 'system error');
-            }
-        });
+        }
 
         function sendSelected() {
             const selectEl = document.getElementById("scenarioSelect");
             if (selectEl.value) sendText(selectEl.value);
+        }
+
+        function sendRandomOnce() {
+            const randomIndex = Math.floor(Math.random() * scenarios.length);
+            const item = scenarios[randomIndex];
+            document.getElementById("scenarioSelect").value = item.text;
+            sendText(item.text);
+        }
+
+        function toggleAutoSimulation() {
+            const btn = document.getElementById('btnAutoToggle');
+            const intervalInput = document.getElementById('intervalInput');
+            
+            if (autoIntervalId !== null) {
+                clearInterval(autoIntervalId);
+                autoIntervalId = null;
+                btn.innerText = '▶️ 자동 랜덤 입력 시작';
+                btn.classList.remove('running');
+                intervalInput.disabled = false;
+                appendLog('⏹️ 자동 랜덤 시뮬레이션이 중지되었습니다.', 'system');
+            } else {
+                let sec = parseFloat(intervalInput.value);
+                if (isNaN(sec) || sec < 0.5) sec = 3;
+                
+                intervalInput.disabled = true;
+                btn.innerText = '⏹️ 자동 시뮬레이션 중지';
+                btn.classList.add('running');
+                appendLog(`▶️ 자동 랜덤 시뮬레이션 시작 (주기: ${sec}초)`, 'system');
+
+                sendRandomOnce();
+                autoIntervalId = setInterval(() => {
+                    sendRandomOnce();
+                }, sec * 1000);
+            }
         }
 
         function handleKeyPress(event) {
@@ -281,58 +524,48 @@
             }
         }
 
+        // 브라우저 내부 ONNX 추론 실행 함수
         async function sendText(text) {
             if (!session) {
-                alert("먼저 ONNX 모델을 업로드해주세요.");
+                alert("먼저 ONNX 모델 파일을 업로드해주세요.");
                 return;
             }
 
             appendLog(text, 'user');
             
             try {
-                // 모델 입력 구조에 맞게 String Tensor 생성 (파이썬의 [[text]] 형태)
                 const tensor = new ort.Tensor('string', [text], [1, 1]);
-                
-                // 모델의 실제 입력 노드 이름 가져오기
                 const inputName = session.inputNames[0];
                 const feeds = {};
                 feeds[inputName] = tensor;
                 
-                // 추론 실행
                 const results = await session.run(feeds);
+                let raw_score = 0.0;
                 
-                // 출력 노드 파악 (회귀 모델은 1개, 분류 모델은 2개)
-                const outputName = session.outputNames[0];
-                let raw_score = 0;
-
                 if (session.outputNames.length > 1) {
-                    // 분류 모델로 만들어진 경우 (확률 배열 반환)
                     const probName = session.outputNames[1];
-                    const probs = results[probName].data; // Flat array
-                    // 0.1, 0.6, 0.9 클래스 매핑 가정
-                    raw_score = (probs[0]*0.1) + (probs[1]*0.6) + (probs[2]*0.9);
+                    const probs = results[probName].data;
+                    raw_score = (probs[0] * 0.1) + (probs[1] * 0.6) + (probs[2] * 0.9);
                 } else {
-                    // 회귀 모델 (Float 값 하나 반환)
+                    const outputName = session.outputNames[0];
                     raw_score = results[outputName].data[0];
                 }
 
-                // 후처리
                 let risk_score = Math.min(1.0, Math.max(0.0, Math.round(raw_score * 10) / 10));
                 let level = Math.floor(risk_score * 10);
                 
-                // 대시보드 업데이트
+                // 반원 계기판 & 누적 그래프 업데이트
                 updateDashboard(risk_score, level);
                 
-                // 시스템 결과 로깅
                 let emoji = '🟢';
                 if (level >= 8) emoji = '🔴';
                 else if (level >= 5) emoji = '🟡';
                 
-                appendLog(`${emoji} [분석 완료] 예측 위험도: ${risk_score.toFixed(1)} (Level ${level})`, 'system');
+                appendLog(`${emoji} [분석 완료] 예측 위험도: ${risk_score.toFixed(1)} (Level ${level} / 10)`, 'system');
 
             } catch (err) {
                 console.error(err);
-                appendLog(`분석 중 에러 발생: ${err.message}`, 'system error');
+                appendLog(`분석 중 오류 발생: ${err.message}`, 'system error');
             }
         }
 
@@ -345,7 +578,7 @@
             
             const bubbleDiv = document.createElement('div');
             bubbleDiv.className = `bubble ${sender}`;
-            bubbleDiv.innerText = text;
+            bubbleDiv.innerHTML = text;
             
             const metaDiv = document.createElement('div');
             metaDiv.className = 'log-meta';
@@ -358,13 +591,15 @@
             container.scrollTop = container.scrollHeight;
         }
 
+        // 반원형 바늘 계기판 및 누적 그래프 갱신
         function updateDashboard(risk_score, level) {
-            const gaugeFill = document.getElementById('gaugeFill');
+            const needle = document.getElementById('gaugeNeedle');
             const riskText = document.getElementById('riskText');
             const riskBadge = document.getElementById('riskBadge');
             
-            const percentage = risk_score * 100;
-            gaugeFill.style.width = percentage + '%';
+            // 바늘 각도 계산: 0.0 -> -90deg, 0.5 -> 0deg, 1.0 -> +90deg
+            const angle = (risk_score * 180) - 90;
+            needle.style.transform = `rotate(${angle}deg)`;
             
             let color = '#51cf66';
             let badgeText = '일반 / 안전 (자체종결)';
@@ -377,11 +612,35 @@
                 badgeText = '위험 / 경계 (주시 필요)';
             }
             
-            gaugeFill.style.backgroundColor = color;
             riskBadge.style.backgroundColor = color;
             riskBadge.innerText = badgeText;
             riskText.innerText = risk_score.toFixed(1);
             riskText.style.color = color;
+
+            // 누적 그래프 데이터 추가
+            const timeStr = new Date().toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const count = historyData.values.length + 1;
+            
+            historyData.labels.push(`#${count} (${timeStr})`);
+            historyData.values.push(risk_score);
+            historyData.colors.push(color);
+
+            // 최대 30개까지만 표시 (초과 시 왼쪽 제거)
+            if (historyData.labels.length > 30) {
+                historyData.labels.shift();
+                historyData.values.shift();
+                historyData.colors.shift();
+            }
+
+            trendChart.data.labels = historyData.labels;
+            trendChart.data.datasets[0].data = historyData.values;
+            trendChart.data.datasets[0].pointBackgroundColor = historyData.colors;
+            trendChart.update();
+
+            // 상단 통계 수치 갱신
+            document.getElementById('statTotalCount').innerText = count;
+            const avg = historyData.values.reduce((a, b) => a + b, 0) / historyData.values.length;
+            document.getElementById('statAvgRisk').innerText = avg.toFixed(2);
         }
     </script>
 </body>
