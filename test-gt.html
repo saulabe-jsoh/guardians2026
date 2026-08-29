@@ -14,15 +14,20 @@
         .header h1 { margin: 0 0 8px 0; color: #212529; font-size: 26px; }
         .header p { margin: 0; color: #868e96; font-size: 14px; }
         
-        .upload-section { max-width: 1250px; margin: 0 auto 20px auto; background: #fff; padding: 16px; border-radius: 12px; text-align: center; border: 2px dashed #4dabf7; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
-        .upload-section label { font-weight: bold; margin-right: 12px; font-size: 15px; color: #1c7ed6; }
-        .upload-section input { font-size: 14px; padding: 8px 12px; cursor: pointer; border: 1px solid #ced4da; border-radius: 6px; }
-        .model-status { margin-top: 10px; font-size: 14px; font-weight: bold; color: #495057; }
+        .status-banner { max-width: 1250px; margin: 0 auto 20px auto; background: #fff; padding: 14px 20px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #dee2e6; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+        .status-indicator { display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 14px; }
+        .status-dot { width: 12px; height: 12px; border-radius: 50%; background-color: #adb5bd; }
+        .status-dot.loading { background-color: #fcc419; animation: pulse 1s infinite alternate; }
+        .status-dot.ready { background-color: #51cf66; }
+        .status-dot.error { background-color: #ff6b6b; }
+        @keyframes pulse { from { opacity: 0.4; } to { opacity: 1; } }
         
+        .manual-file-btn { font-size: 13px; color: #4dabf7; cursor: pointer; text-decoration: underline; background: none; border: none; padding: 0; }
+
         .dashboard { display: grid; grid-template-columns: 380px 1fr; max-width: 1250px; margin: 0 auto; gap: 20px; }
         @media (max-width: 900px) { .dashboard { grid-template-columns: 1fr; } }
         
-        /* 왼쪽 패널: 계기판 및 컨트롤 */
+        /* 왼쪽 패널 */
         .left-panel { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.06); display: flex; flex-direction: column; gap: 15px; }
         
         /* 반원형 계기판 스타일 */
@@ -88,10 +93,9 @@
         .btn-auto-toggle.running:hover:not(:disabled) { background: #e03131; }
         .btn-auto-toggle:disabled { background: #adb5bd; cursor: not-allowed; }
 
-        /* 오른쪽 패널: 누적 그래프 + 상황 로그 */
+        /* 오른쪽 패널 */
         .right-panel { display: flex; flex-direction: column; gap: 20px; }
         
-        /* 상단: 누적 위험도 추이 그래프 영역 */
         .chart-card { background: white; padding: 18px 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.06); }
         .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 2px solid #dee2e6; padding-bottom: 8px; }
         .chart-header h3 { margin: 0; font-size: 17px; color: #343a40; }
@@ -100,7 +104,6 @@
         .btn-clear-chart { padding: 4px 10px; font-size: 12px; background: #e9ecef; border: 1px solid #ced4da; border-radius: 5px; cursor: pointer; }
         .btn-clear-chart:hover { background: #dee2e6; }
 
-        /* 하단: 상황 로그 영역 */
         .chat-card { background: white; padding: 18px 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.06); display: flex; flex-direction: column; height: 380px; }
         .chat-card h3 { margin: 0 0 10px 0; border-bottom: 2px solid #dee2e6; padding-bottom: 8px; font-size: 17px; color: #343a40; }
         .log-container { flex: 1; overflow-y: auto; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 14px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px; }
@@ -128,26 +131,29 @@
 <body>
     <div class="header">
         <h1>🚨 가디언즈(Gardians) 실시간 위험도 모니터링</h1>
-        <p>반원형 바늘 계기판과 실시간 누적 위험도 추이 분석 시스템 (Web Standalone)</p>
+        <p>GitHub Pages 정적 호스팅 전용 ONNX Web 추론 시스템</p>
     </div>
 
-    <!-- ONNX 모델 파일 업로드 영역 -->
-    <div class="upload-section">
-        <label for="modelUpload">📂 로컬 ONNX 모델 선택:</label>
-        <input type="file" id="modelUpload" accept=".onnx">
-        <div id="modelStatus" class="model-status">상단의 버튼을 눌러 <b>gardians_model.onnx</b> 파일을 선택해주세요.</div>
+    <!-- 모델 로드 상태 배너 -->
+    <div class="status-banner">
+        <div class="status-indicator">
+            <div id="statusDot" class="status-dot loading"></div>
+            <span id="statusText">서버에서 gardians_model.onnx 파일을 로드하는 중...</span>
+        </div>
+        <div>
+            <input type="file" id="manualModelUpload" accept=".onnx" style="display: none;">
+            <button class="manual-file-btn" onclick="document.getElementById('manualModelUpload').click()">파일 직접 선택(대체용)</button>
+        </div>
     </div>
 
     <div class="dashboard">
-        <!-- 왼쪽 패널: 계기판 및 컨트롤 -->
+        <!-- 왼쪽 패널 -->
         <div class="left-panel">
-            <!-- 반원형 바늘 계기판 -->
             <div class="gauge-section">
                 <div class="gauge-title">실시간 위험도 계기판</div>
                 <div class="gauge-container">
                     <svg class="gauge-svg" viewBox="0 0 280 280">
                         <circle class="gauge-track" cx="140" cy="140" r="110" />
-                        <!-- 초록 (0~0.4: 40%), 노랑 (0.4~0.7: 30%), 빨강 (0.7~1.0: 30%) -->
                         <circle class="gauge-arc-green" cx="140" cy="140" r="110" />
                         <circle class="gauge-arc-yellow" cx="140" cy="140" r="110" />
                         <circle class="gauge-arc-red" cx="140" cy="140" r="110" />
@@ -192,16 +198,15 @@
             </div>
         </div>
 
-        <!-- 오른쪽 패널: 누적 그래프 + 상황 로그 -->
+        <!-- 오른쪽 패널 -->
         <div class="right-panel">
-            <!-- 상단: 누적 위험도 추이 그래프 -->
             <div class="chart-card">
                 <div class="chart-header">
                     <h3>📈 누적 위험도 시계열 추이 (Timeline Trend)</h3>
                     <div class="chart-stats">
                         <span>누적 건수: <b id="statTotalCount" style="color:#1c7ed6;">0</b>건</span>
                         <span>평균 위험도: <b id="statAvgRisk" style="color:#e03131;">0.00</b></span>
-                        <button class="btn-clear-chart" onclick="resetChart()">그래프 초기화</button>
+                        <button class="btn-clear-chart" onclick="resetChart()">초기화</button>
                     </div>
                 </div>
                 <div class="chart-container">
@@ -209,12 +214,11 @@
                 </div>
             </div>
 
-            <!-- 하단: 상황 로그 -->
             <div class="chat-card">
                 <h3>상황 로그 및 실시간 분석 (Chat Log)</h3>
                 <div class="log-container" id="logContainer">
                     <div class="log-item system">
-                        <div class="bubble system">✅ <b>gardians_model.onnx</b> 파일을 업로드하면 계기판과 누적 추이 그래프가 활성화됩니다.</div>
+                        <div class="bubble system">⏳ <b>gardians_model.onnx</b> 파일을 GitHub Pages 저장소로부터 자동 로드하고 있습니다...</div>
                     </div>
                 </div>
                 
@@ -231,14 +235,8 @@
         let autoIntervalId = null;
         let trendChart = null;
 
-        // 누적 데이터 저장소
-        const historyData = {
-            labels: [],
-            values: [],
-            colors: []
-        };
+        const historyData = { labels: [], values: [], colors: [] };
 
-        // 100건 시나리오 데이터셋
         const scenarios = [
             // Zero Risk (10건)
             { text: "오늘 저녁 메뉴는 김치찌개로 할까 생각 중이야.", group: "🟢 [Zero Risk: 일상 대화]" },
@@ -351,9 +349,77 @@
 
         window.onload = function() {
             initChart();
+            initDropdown();
+            // GitHub Pages 로드 시 같은 경로에 있는 gardians_model.onnx 자동 Fetch 시도
+            autoLoadModelFromRepository();
         };
 
-        // Chart.js 초기화
+        // 💡 GitHub Pages 저장소에서 gardians_model.onnx 자동 로드 함수
+        async function autoLoadModelFromRepository() {
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+            
+            // 상대 경로로 같은 폴더의 ONNX 파일 탐색
+            const modelUrl = './gardians_model.onnx';
+
+            try {
+                statusDot.className = 'status-dot loading';
+                statusText.innerText = '서버에서 gardians_model.onnx 파일을 로드하는 중...';
+
+                // URL로부터 ONNX 세션 직접 생성
+                session = await ort.InferenceSession.create(modelUrl);
+                
+                onModelLoadSuccess('gardians_model.onnx (자동 로드 완료)');
+            } catch (err) {
+                console.warn('자동 로드 실패 (로컬 파일 선택 필요):', err);
+                statusDot.className = 'status-dot error';
+                statusText.innerHTML = `⚠️ 자동 로드 실패: 모델 파일이 같은 폴더에 없거나 CORS 제한이 발생했습니다. 우측의 <b>[파일 직접 선택]</b>을 사용하세요.`;
+                appendLog(`⚠️ 원격 자동 로드 실패 (${err.message}). 우측 상단의 '파일 직접 선택'으로 업로드하세요.`, 'system error');
+            }
+        }
+
+        // 수동 파일 선택 핸들러
+        document.getElementById('manualModelUpload').addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+
+            statusDot.className = 'status-dot loading';
+            statusText.innerText = `'${file.name}' 파일을 브라우저로 로드하는 중...`;
+            appendLog(`⏳ '${file.name}' 파일을 수동으로 로드하고 있습니다...`, 'system');
+
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                session = await ort.InferenceSession.create(arrayBuffer);
+                onModelLoadSuccess(file.name);
+            } catch (err) {
+                statusDot.className = 'status-dot error';
+                statusText.innerText = `❌ 로드 실패: ${err.message}`;
+                appendLog(`❌ 모델 로드 실패: ${err.message}`, 'system error');
+            }
+        });
+
+        // 모델 로드 성공 시 공통 처리
+        function onModelLoadSuccess(sourceName) {
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+
+            statusDot.className = 'status-dot ready';
+            statusText.innerText = `✅ 모델 준비 완료: ${sourceName} (입력: ${session.inputNames.join(', ')} / 출력: ${session.outputNames.join(', ')})`;
+            
+            appendLog(`✅ <b>${sourceName}</b> 모델 로드 성공! 실시간 분석이 활성화되었습니다.`, 'system');
+
+            document.getElementById('scenarioSelect').disabled = false;
+            document.getElementById('btnPreset').disabled = false;
+            document.getElementById('btnRandomOnce').disabled = false;
+            document.getElementById('btnAutoToggle').disabled = false;
+            document.getElementById('chatInput').disabled = false;
+            document.getElementById('btnSend').disabled = false;
+            document.getElementById('riskBadge').innerText = '준비 완료';
+        }
+
         function initChart() {
             const ctx = document.getElementById('trendChart').getContext('2d');
             trendChart = new Chart(ctx, {
@@ -384,9 +450,7 @@
                             ticks: { stepSize: 0.2, font: { weight: 'bold' } },
                             grid: { color: '#f1f3f5' }
                         },
-                        x: {
-                            grid: { display: false }
-                        }
+                        x: { grid: { display: false } }
                     },
                     plugins: {
                         legend: { display: false },
@@ -402,7 +466,6 @@
             });
         }
 
-        // 그래프 초기화
         function resetChart() {
             historyData.labels = [];
             historyData.values = [];
@@ -417,40 +480,6 @@
             appendLog('📊 누적 위험도 추이 그래프가 초기화되었습니다.', 'system');
         }
 
-        // ONNX 모델 파일 업로드 핸들러
-        document.getElementById('modelUpload').addEventListener('change', async (event) => {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const statusEl = document.getElementById('modelStatus');
-            statusEl.innerHTML = `⏳ <b>${file.name}</b> 로드 및 초기화 중...`;
-            appendLog(`⏳ '${file.name}' 파일을 브라우저 메모리로 로드하고 있습니다...`, 'system');
-
-            try {
-                const arrayBuffer = await file.arrayBuffer();
-                session = await ort.InferenceSession.create(arrayBuffer);
-                
-                statusEl.innerHTML = `✅ <b>${file.name}</b> 로드 완료! (입력: ${session.inputNames.join(', ')} / 출력: ${session.outputNames.join(', ')})`;
-                statusEl.style.color = "#2b8a3e";
-                appendLog(`✅ <b>${file.name}</b> 모델 로드 성공! 반원형 계기판과 누적 추이 분석이 준비되었습니다.`, 'system');
-
-                initDropdown();
-                document.getElementById('scenarioSelect').disabled = false;
-                document.getElementById('btnPreset').disabled = false;
-                document.getElementById('btnRandomOnce').disabled = false;
-                document.getElementById('btnAutoToggle').disabled = false;
-                document.getElementById('chatInput').disabled = false;
-                document.getElementById('btnSend').disabled = false;
-                document.getElementById('riskBadge').innerText = '준비 완료';
-
-            } catch (err) {
-                statusEl.innerHTML = `❌ 모델 로드 실패: ${err.message}`;
-                statusEl.style.color = "#e03131";
-                appendLog(`❌ 모델 로드 실패: ${err.message}`, 'system error');
-            }
-        });
-
-        // 100건 드롭다운 세팅
         function initDropdown() {
             const selectEl = document.getElementById("scenarioSelect");
             selectEl.innerHTML = "";
@@ -524,10 +553,9 @@
             }
         }
 
-        // 브라우저 내부 ONNX 추론 실행 함수
         async function sendText(text) {
             if (!session) {
-                alert("먼저 ONNX 모델 파일을 업로드해주세요.");
+                alert("모델이 아직 준비되지 않았습니다.");
                 return;
             }
 
@@ -554,7 +582,6 @@
                 let risk_score = Math.min(1.0, Math.max(0.0, Math.round(raw_score * 10) / 10));
                 let level = Math.floor(risk_score * 10);
                 
-                // 반원 계기판 & 누적 그래프 업데이트
                 updateDashboard(risk_score, level);
                 
                 let emoji = '🟢';
@@ -591,13 +618,11 @@
             container.scrollTop = container.scrollHeight;
         }
 
-        // 반원형 바늘 계기판 및 누적 그래프 갱신
         function updateDashboard(risk_score, level) {
             const needle = document.getElementById('gaugeNeedle');
             const riskText = document.getElementById('riskText');
             const riskBadge = document.getElementById('riskBadge');
             
-            // 바늘 각도 계산: 0.0 -> -90deg, 0.5 -> 0deg, 1.0 -> +90deg
             const angle = (risk_score * 180) - 90;
             needle.style.transform = `rotate(${angle}deg)`;
             
@@ -617,7 +642,6 @@
             riskText.innerText = risk_score.toFixed(1);
             riskText.style.color = color;
 
-            // 누적 그래프 데이터 추가
             const timeStr = new Date().toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
             const count = historyData.values.length + 1;
             
@@ -625,7 +649,6 @@
             historyData.values.push(risk_score);
             historyData.colors.push(color);
 
-            // 최대 30개까지만 표시 (초과 시 왼쪽 제거)
             if (historyData.labels.length > 30) {
                 historyData.labels.shift();
                 historyData.values.shift();
@@ -637,7 +660,6 @@
             trendChart.data.datasets[0].pointBackgroundColor = historyData.colors;
             trendChart.update();
 
-            // 상단 통계 수치 갱신
             document.getElementById('statTotalCount').innerText = count;
             const avg = historyData.values.reduce((a, b) => a + b, 0) / historyData.values.length;
             document.getElementById('statAvgRisk').innerText = avg.toFixed(2);
