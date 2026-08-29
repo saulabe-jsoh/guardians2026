@@ -6,7 +6,7 @@
     <title>가디언즈(Gardians) 실시간 위험도 모니터링</title>
     <!-- ONNX Runtime Web 라이브러리 -->
     <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
-    <!-- Chart.js 라이브러리 (누적 추이 그래프용) -->
+    <!-- Chart.js 라이브러리 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: 'Malgun Gothic', sans-serif; background-color: #f1f3f5; margin: 0; padding: 20px; color: #343a40; }
@@ -14,7 +14,9 @@
         .header h1 { margin: 0 0 8px 0; color: #212529; font-size: 26px; }
         .header p { margin: 0; color: #868e96; font-size: 14px; }
         
-        .status-banner { max-width: 1250px; margin: 0 auto 20px auto; background: #fff; padding: 14px 20px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #dee2e6; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+        /* 모델 로드 제어 영역 */
+        .model-control-card { max-width: 1300px; margin: 0 auto 20px auto; background: #fff; padding: 16px 20px; border-radius: 12px; border: 1px solid #dee2e6; box-shadow: 0 2px 6px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 12px; }
+        .model-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
         .status-indicator { display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 14px; }
         .status-dot { width: 12px; height: 12px; border-radius: 50%; background-color: #adb5bd; }
         .status-dot.loading { background-color: #fcc419; animation: pulse 1s infinite alternate; }
@@ -22,10 +24,14 @@
         .status-dot.error { background-color: #ff6b6b; }
         @keyframes pulse { from { opacity: 0.4; } to { opacity: 1; } }
         
-        .manual-file-btn { font-size: 13px; color: #4dabf7; cursor: pointer; text-decoration: underline; background: none; border: none; padding: 0; }
+        .mode-selection-box { display: flex; align-items: center; gap: 15px; padding: 12px 16px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e9ecef; flex-wrap: wrap; }
+        .mode-btn { padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; border: 1px solid #ced4da; background: #fff; transition: all 0.2s; }
+        .mode-btn.active { background: #339af0; color: #fff; border-color: #339af0; }
+        .file-input-wrapper { display: flex; align-items: center; gap: 10px; }
+        .file-input-wrapper input { font-size: 13px; padding: 6px 10px; border: 1px solid #ced4da; border-radius: 6px; background: #fff; cursor: pointer; }
 
-        .dashboard { display: grid; grid-template-columns: 380px 1fr; max-width: 1250px; margin: 0 auto; gap: 20px; }
-        @media (max-width: 900px) { .dashboard { grid-template-columns: 1fr; } }
+        .dashboard { display: grid; grid-template-columns: 400px 1fr; max-width: 1300px; margin: 0 auto; gap: 20px; }
+        @media (max-width: 950px) { .dashboard { grid-template-columns: 1fr; } }
         
         /* 왼쪽 패널 */
         .left-panel { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.06); display: flex; flex-direction: column; gap: 15px; }
@@ -34,11 +40,36 @@
         .gauge-section { text-align: center; padding: 15px 10px; background: #f8f9fa; border-radius: 12px; border: 1px solid #e9ecef; position: relative; }
         .gauge-title { margin: 0 0 10px 0; color: #495057; font-size: 16px; font-weight: bold; }
         .gauge-container { position: relative; width: 280px; height: 145px; margin: 0 auto; overflow: hidden; }
-        .gauge-svg { width: 280px; height: 280px; transform: rotate(-90deg); }
-        .gauge-track { fill: none; stroke: #e9ecef; stroke-width: 24; }
-        .gauge-arc-green { fill: none; stroke: #51cf66; stroke-width: 24; stroke-dasharray: 176 440; stroke-dashoffset: 0; }
-        .gauge-arc-yellow { fill: none; stroke: #fcc419; stroke-width: 24; stroke-dasharray: 132 440; stroke-dashoffset: -176; }
-        .gauge-arc-red { fill: none; stroke: #ff6b6b; stroke-width: 24; stroke-dasharray: 132 440; stroke-dashoffset: -308; }
+        .gauge-svg { width: 280px; height: 280px; transform: rotate(180deg); }
+        /* 배경 회색 트랙 (전체 반원 100%) */
+		.gauge-track { fill: none; stroke: #e9ecef; stroke-width: 24; stroke-dasharray: 345.6 692; stroke-dashoffset: 0; }
+        /* 반원 게이지 호(Arc) 4구간 분할 */
+		/* 초록색 (0.0~0.3, 왼쪽 30%) */
+		.gauge-arc-green { 
+			fill: none; 
+			stroke: #51cf66; 
+			stroke-width: 24; 
+			stroke-dasharray: 103.7 692; 
+			stroke-dashoffset: 0; 
+		}
+
+		/* 노란색 (0.3~0.7, 중간 40%) */
+		.gauge-arc-yellow { 
+			fill: none; 
+			stroke: #fcc419; 
+			stroke-width: 24; 
+			stroke-dasharray: 138.2 692; 
+			stroke-dashoffset: -103.7; 
+		}
+
+		/* 빨간색 (0.7~1.0, 오른쪽 30%) */
+		.gauge-arc-red { 
+			fill: none; 
+			stroke: #ff6b6b; 
+			stroke-width: 24; 
+			stroke-dasharray: 103.7 692; 
+			stroke-dashoffset: -241.9; 
+		}
         
         /* 바늘(Needle) */
         .needle-pivot { position: absolute; bottom: 0; left: 140px; width: 0; height: 0; }
@@ -72,26 +103,30 @@
         .risk-value-display { margin-top: 8px; font-size: 30px; font-weight: 800; color: #495057; }
         .risk-badge { display: inline-block; padding: 5px 14px; border-radius: 20px; font-size: 13px; font-weight: bold; color: white; background: #adb5bd; }
 
-        .preset-section h4, .auto-section h4 { color: #495057; margin: 0 0 8px 0; border-bottom: 2px solid #dee2e6; padding-bottom: 5px; font-size: 15px; }
-        .preset-select { width: 100%; padding: 10px; margin-bottom: 8px; border-radius: 8px; border: 1px solid #ced4da; font-size: 13px; outline: none; background-color: #fff; box-sizing: border-box; }
+        .control-card { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 10px; padding: 14px; }
+        .control-card h4 { color: #495057; margin: 0 0 10px 0; border-bottom: 2px solid #dee2e6; padding-bottom: 5px; font-size: 15px; }
         
-        .btn-group { display: flex; gap: 8px; margin-bottom: 10px; }
-        .preset-btn { flex: 1; padding: 10px; background: #20c997; color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
-        .preset-btn:hover:not(:disabled) { background: #12b886; }
-        .preset-btn:disabled { background: #adb5bd; cursor: not-allowed; }
-        .btn-random-once { background: #fab005; }
-        .btn-random-once:hover:not(:disabled) { background: #f59f00; }
+        .styled-select { width: 100%; padding: 10px; margin-bottom: 8px; border-radius: 8px; border: 1px solid #ced4da; font-size: 13px; outline: none; background-color: #fff; box-sizing: border-box; }
+        
+        .btn-group { display: flex; gap: 8px; margin-bottom: 8px; }
+        .action-btn { flex: 1; padding: 10px; border: none; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+        .btn-primary { background: #20c997; color: white; }
+        .btn-primary:hover:not(:disabled) { background: #12b886; }
+        .btn-warning { background: #fab005; color: white; }
+        .btn-warning:hover:not(:disabled) { background: #f59f00; }
+        .btn-info { background: #4dabf7; color: white; }
+        .btn-info:hover:not(:disabled) { background: #339af0; }
+        .btn-danger { background: #fa5252; color: white; }
+        .btn-danger:hover:not(:disabled) { background: #e03131; }
+        .action-btn:disabled { background: #adb5bd !important; cursor: not-allowed; }
 
-        .auto-section { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 10px; padding: 12px; }
-        .auto-controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
-        .auto-controls label { font-size: 13px; font-weight: bold; color: #495057; }
+        .interval-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+        .interval-row label { font-size: 13px; font-weight: bold; color: #495057; }
         .interval-input { width: 65px; padding: 6px 8px; border: 1px solid #ced4da; border-radius: 6px; font-size: 13px; text-align: center; outline: none; }
-        
-        .btn-auto-toggle { width: 100%; padding: 10px; background: #4dabf7; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
-        .btn-auto-toggle:hover:not(:disabled) { background: #339af0; }
-        .btn-auto-toggle.running { background: #fa5252; }
-        .btn-auto-toggle.running:hover:not(:disabled) { background: #e03131; }
-        .btn-auto-toggle:disabled { background: #adb5bd; cursor: not-allowed; }
+
+        .progress-bar-container { width: 100%; height: 8px; background: #dee2e6; border-radius: 4px; overflow: hidden; margin-top: 8px; display: none; }
+        .progress-bar-fill { height: 100%; width: 0%; background: #339af0; transition: width 0.3s; }
+        .progress-text { font-size: 12px; color: #868e96; text-align: right; margin-top: 4px; display: none; }
 
         /* 오른쪽 패널 */
         .right-panel { display: flex; flex-direction: column; gap: 20px; }
@@ -100,15 +135,15 @@
         .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 2px solid #dee2e6; padding-bottom: 8px; }
         .chart-header h3 { margin: 0; font-size: 17px; color: #343a40; }
         .chart-stats { font-size: 13px; font-weight: bold; color: #495057; display: flex; gap: 15px; }
-        .chart-container { position: relative; width: 100%; height: 180px; }
+        .chart-container { position: relative; width: 100%; height: 190px; }
         .btn-clear-chart { padding: 4px 10px; font-size: 12px; background: #e9ecef; border: 1px solid #ced4da; border-radius: 5px; cursor: pointer; }
         .btn-clear-chart:hover { background: #dee2e6; }
 
-        .chat-card { background: white; padding: 18px 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.06); display: flex; flex-direction: column; height: 380px; }
+        .chat-card { background: white; padding: 18px 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.06); display: flex; flex-direction: column; height: 420px; }
         .chat-card h3 { margin: 0 0 10px 0; border-bottom: 2px solid #dee2e6; padding-bottom: 8px; font-size: 17px; color: #343a40; }
         .log-container { flex: 1; overflow-y: auto; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 14px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px; }
         
-        .log-item { display: flex; flex-direction: column; max-width: 82%; }
+        .log-item { display: flex; flex-direction: column; max-width: 85%; }
         .log-item.user { align-self: flex-end; }
         .log-item.system { align-self: flex-start; max-width: 90%; }
         
@@ -131,70 +166,88 @@
 <body>
     <div class="header">
         <h1>🚨 가디언즈(Gardians) 실시간 위험도 모니터링</h1>
-        <p>GitHub Pages 정적 호스팅 전용 ONNX Web 추론 시스템</p>
+        <p>GitHub Pages 원격 자동 로드 및 로컬 ONNX 모델 직접 업로드 지원 시스템</p>
     </div>
 
-    <!-- 모델 로드 상태 배너 -->
-    <div class="status-banner">
-        <div class="status-indicator">
-            <div id="statusDot" class="status-dot loading"></div>
-            <span id="statusText">서버에서 gardians_model.onnx 파일을 로드하는 중...</span>
-        </div>
-        <div>
-            <input type="file" id="manualModelUpload" accept=".onnx" style="display: none;">
-            <button class="manual-file-btn" onclick="document.getElementById('manualModelUpload').click()">파일 직접 선택(대체용)</button>
+    <!-- 모델 제어 및 모드 선택 배너 -->
+    <div class="model-control-card">
+        <div class="model-header">
+            <div class="status-indicator">
+                <div id="statusDot" class="status-dot loading"></div>
+                <span id="statusText">모델 초기화 대기 중...</span>
+            </div>
+            <div class="mode-selection-box">
+                <button id="btnModeWeb" class="mode-btn active" onclick="switchLoadMode('web')">🌐 GitHub Pages 모드 (자동 탐색)</button>
+                <button id="btnModeLocal" class="mode-btn" onclick="switchLoadMode('local')">💻 로컬 파일 모드 (직접 선택)</button>
+                <div id="localFileWrapper" class="file-input-wrapper" style="display: none;">
+                    <input type="file" id="localModelUpload" accept=".onnx">
+                </div>
+            </div>
         </div>
     </div>
 
     <div class="dashboard">
         <!-- 왼쪽 패널 -->
         <div class="left-panel">
+            <!-- 반원형 계기판 -->
             <div class="gauge-section">
                 <div class="gauge-title">실시간 위험도 계기판</div>
                 <div class="gauge-container">
                     <svg class="gauge-svg" viewBox="0 0 280 280">
                         <circle class="gauge-track" cx="140" cy="140" r="110" />
-                        <circle class="gauge-arc-green" cx="140" cy="140" r="110" />
-                        <circle class="gauge-arc-yellow" cx="140" cy="140" r="110" />
-                        <circle class="gauge-arc-red" cx="140" cy="140" r="110" />
+						<!-- 3단계 호(Arc) -->
+						<circle class="gauge-arc-green" cx="140" cy="140" r="110" />
+						<circle class="gauge-arc-yellow" cx="140" cy="140" r="110" />
+						<circle class="gauge-arc-red" cx="140" cy="140" r="110" />
                     </svg>
                     <div class="needle-pivot">
                         <div id="gaugeNeedle" class="needle"></div>
                         <div class="needle-center-cap"></div>
                     </div>
                 </div>
+                <!-- 0.0~0.3 / 0.3~0.7 / 0.7~1.0 라벨 반영 -->
                 <div class="gauge-scale-labels">
-                    <span>0.0 (안전)</span>
-                    <span>0.5 (경계)</span>
-                    <span>1.0 (긴급)</span>
+                    <span>0.0 (저위험)</span>
+                    <span>0.3~0.7 (중위험)</span>
+                    <span>0.7~1.0 (고위험)</span>
                 </div>
                 <div id="riskText" class="risk-value-display">0.0</div>
                 <div id="riskBadge" class="risk-badge">모델 로드 대기</div>
             </div>
 
-            <!-- 수동/개별 선택 섹션 -->
-            <div class="preset-section">
-                <h4>테스트 시나리오 선택 (100건)</h4>
-                <select id="scenarioSelect" class="preset-select" disabled>
-                    <option value="">-- 모델 로드 후 활성화됩니다 --</option>
+            <!-- 50문장 연속 시나리오 재생 섹션 -->
+            <div class="control-card">
+                <h4>🎬 50문장 장문 시나리오 연속 재생</h4>
+                <select id="fullScenarioSelect" class="styled-select" onchange="onFullScenarioChange()" disabled>
+                    <option value="0">시나리오 1: 전 연인의 집착 및 주거침입 흉기 난동 (50문장)</option>
+                    <option value="1">시나리오 2: 가해자 감금/위협 중 배달 위장 112 신고 (50문장)</option>
+                    <option value="2">시나리오 3: 직장 동료의 스토킹 및 배관 침입 폭행 (50문장)</option>
+                    <option value="3">시나리오 4: 이웃 주민의 관음/감시 및 복도 흉기 난동 (50문장)</option>
+                    <option value="4">시나리오 5: 사이버 스토킹 미행 및 상가 납치 시도 (50문장)</option>
                 </select>
-                <div class="btn-group">
-                    <button class="preset-btn" id="btnPreset" onclick="sendSelected()" disabled>선택 분석</button>
-                    <button class="preset-btn btn-random-once" id="btnRandomOnce" onclick="sendRandomOnce()" disabled>🎲 랜덤 1건 분석</button>
-                </div>
-            </div>
-
-            <!-- 자동 시뮬레이션 섹션 -->
-            <div class="auto-section">
-                <h4>자동 시뮬레이션 (랜덤 재생)</h4>
-                <div class="auto-controls">
-                    <label for="intervalInput">⏱️ 전송 주기 (초):</label>
+                <div class="interval-row">
+                    <label for="scenarioIntervalInput">⏱️ 문장 간격:</label>
                     <div>
-                        <input type="number" id="intervalInput" class="interval-input" value="3" min="0.5" max="60" step="0.5">
+                        <input type="number" id="scenarioIntervalInput" class="interval-input" value="1.5" min="0.5" max="10" step="0.5">
                         <span style="font-size: 13px; color: #868e96;">초</span>
                     </div>
                 </div>
-                <button class="btn-auto-toggle" id="btnAutoToggle" onclick="toggleAutoSimulation()" disabled>▶️ 자동 랜덤 입력 시작</button>
+                <div class="btn-group">
+                    <button class="action-btn btn-info" id="btnPlayScenario" onclick="toggleScenarioPlay()" disabled>▶️ 전체 시나리오 연속 실행</button>
+                    <button class="action-btn btn-warning" id="btnNextSentence" onclick="playNextSentence()" disabled>다음 1문장 ➡️</button>
+                </div>
+                <div id="scenarioProgressContainer" class="progress-bar-container">
+                    <div id="scenarioProgressBar" class="progress-bar-fill"></div>
+                </div>
+                <div id="scenarioProgressText" class="progress-text">진행도: 0 / 50</div>
+            </div>
+
+            <!-- 단일 문장 개별 선택 섹션 -->
+            <div class="control-card">
+                <h4>🔍 개별 문장 선택 (현재 시나리오 내)</h4>
+                <select id="sentenceSelect" class="styled-select" disabled>
+                </select>
+                <button class="action-btn btn-primary" id="btnSendSentence" onclick="sendSelectedSentence()" disabled style="width: 100%;">선택 문장 분석</button>
             </div>
         </div>
 
@@ -202,7 +255,7 @@
         <div class="right-panel">
             <div class="chart-card">
                 <div class="chart-header">
-                    <h3>📈 누적 위험도 시계열 추이 (Timeline Trend)</h3>
+                    <h3>📈 실시간 누적 위험도 시계열 추이 (Timeline Trend)</h3>
                     <div class="chart-stats">
                         <span>누적 건수: <b id="statTotalCount" style="color:#1c7ed6;">0</b>건</span>
                         <span>평균 위험도: <b id="statAvgRisk" style="color:#e03131;">0.00</b></span>
@@ -218,12 +271,12 @@
                 <h3>상황 로그 및 실시간 분석 (Chat Log)</h3>
                 <div class="log-container" id="logContainer">
                     <div class="log-item system">
-                        <div class="bubble system">⏳ <b>gardians_model.onnx</b> 파일을 GitHub Pages 저장소로부터 자동 로드하고 있습니다...</div>
+                        <div class="bubble system">✅ <b>gardians_model.onnx</b> 모델을 준비하고 있습니다...</div>
                     </div>
                 </div>
                 
                 <div class="input-area">
-                    <input type="text" id="chatInput" placeholder="신고 텍스트나 대화 내용을 입력하세요..." onkeypress="handleKeyPress(event)" disabled>
+                    <input type="text" id="chatInput" placeholder="신고 텍스트나 대화 내용을 직접 입력하세요..." onkeypress="handleKeyPress(event)" disabled>
                     <button id="btnSend" onclick="sendManualText()" disabled>전송</button>
                 </div>
             </div>
@@ -232,154 +285,339 @@
 
     <script>
         let session = null;
-        let autoIntervalId = null;
         let trendChart = null;
+        let scenarioIntervalId = null;
+        let currentScenarioIndex = 0;
+        let currentSentenceIndex = 0;
 
         const historyData = { labels: [], values: [], colors: [] };
 
-        const scenarios = [
-            // Zero Risk (10건)
-            { text: "오늘 저녁 메뉴는 김치찌개로 할까 생각 중이야.", group: "🟢 [Zero Risk: 일상 대화]" },
-            { text: "내일 비가 온다니까 출근할 때 우산 꼭 챙겨가.", group: "🟢 [Zero Risk: 일상 대화]" },
-            { text: "주말에 가족들이랑 제주도 여행 가기로 예약했어.", group: "🟢 [Zero Risk: 일상 대화]" },
-            { text: "새로 나온 영화 재미있다고 하던데 이번 주에 보러 갈래?", group: "🟢 [Zero Risk: 일상 대화]" },
-            { text: "강아지 사료가 다 떨어져서 내일 마트에 사러 가야 해.", group: "🟢 [Zero Risk: 일상 대화]" },
-            { text: "오늘 회사에서 회식이 있어서 조금 늦게 들어갈 것 같아.", group: "🟢 [Zero Risk: 일상 대화]" },
-            { text: "세탁소에 맡긴 겨울 코트 언제 찾으러 가야 하는지 알아?", group: "🟢 [Zero Risk: 일상 대화]" },
-            { text: "인터넷 쇼핑몰에서 주문한 택배가 벌써 도착했네.", group: "🟢 [Zero Risk: 일상 대화]" },
-            { text: "요즘 날씨가 너무 더워서 에어컨을 안 틀 수가 없네.", group: "🟢 [Zero Risk: 일상 대화]" },
-            { text: "아까 마트에서 장보다가 우연히 고등학교 동창을 만났어.", group: "🟢 [Zero Risk: 일상 대화]" },
-
-            // Low Risk (30건)
-            { text: "이웃 간의 소음 문제로 층간소음 갈등이 있습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
-            { text: "사소한 말다툼이 있었어요. 별다른 특이사항은 없습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
-            { text: "친구가 저에게 과도하게 연락을 하고 선물을 보냅니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
-            { text: "헤어진 연인이 잘 지내냐고 문자를 보냈습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
-            { text: "술에 취한 행인과 길에서 가벼운 시비가 붙었습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
-            { text: "주차 문제로 이웃과 말다툼을 했습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
-            { text: "전화로 욕설을 하며 시비를 거는 사람이 있습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
-            { text: "중고거래 중 판매자와 문자로 다퉜습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
-            { text: "층간소음 갈등으로 윗집 사람이 연락을 해왔습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
-            { text: "동네 친구와 사소한 오해로 갈등이 생겼습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
-            { text: "동거남과 가벼운 말다툼을 하고 집을 나왔습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
-            { text: "아내가 화가 나서 친정으로 가버렸습니다. 단순 말다툼입니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
-            { text: "남편이 술 먹고 늦게 와서 말다툼을 했습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
-            { text: "지인이 돈을 갚지 않아 문자로 다투었습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
-            { text: "모르는 번호로 자꾸 전화가 오는데 스팸 같습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
-            { text: "옆집 개 짖는 소리 때문에 시비가 붙었습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
-            { text: "전여친이 페이스북 메시지로 연락을 시도합니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
-            { text: "단순한 오해로 지인과 갈등이 빚어졌습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
-            { text: "식당에서 다른 손님과 자리 문제로 말다툼이 있었습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
-            { text: "층간소음 때문에 관리사무소에 연락했습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
-            { text: "친구끼리 술자리에서 시비가 붙었습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
-            { text: "택시기사와 요금 문제로 말다툼을 했습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
-            { text: "전화로 계속 상품 가입을 권유하는 연락이 옵니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
-            { text: "헤어진 지 1년 된 전남친이 갑자기 선물을 보냈어요.", group: "🟡 [Low Risk: 단순 시비/연락]" },
-            { text: "오랫동안 알고 지낸 동네 형과 말다툼을 했습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
-            { text: "길거리에서 어깨를 부딪혀 시비가 붙었습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
-            { text: "층간소음 문제로 아래층에서 올라와 다투었습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
-            { text: "지인과 약속 시간 문제로 말다툼을 했습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
-            { text: "단순한 말다툼이라 경찰 출동은 필요 없습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
-            { text: "전화로 화를 내긴 했지만 폭력 사태는 없었습니다.", group: "🟡 [Low Risk: 단순 시비/연락]" },
-
-            // Mid Risk (30건)
-            { text: "최근 낯선 사람이 계속 집 주변을 맴돕니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
-            { text: "오랫동안 헤어진 연인이 지속적으로 연락을 시도하고 찾아옵니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
-            { text: "누군가 제 뒤를 미행하는 것 같아 불안합니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
-            { text: "전남친이 안 만나주면 회사로 찾아오겠다고 협박합니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
-            { text: "모르는 번호로 지속적인 스토킹 문자가 오고 있습니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
-            { text: "퇴근길에 낯선 남자가 계속 쫓아오는 느낌이 듭니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
-            { text: "헤어진 여자친구가 매일 집앞에서 기다리고 있습니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
-            { text: "누군가 제 차량 주변을 계속 배회하고 있습니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
-            { text: "스토킹 가해자가 또다시 제 SNS를 염탐하고 연락을 시도합니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
-            { text: "전남편이 이혼 후에도 지속적으로 찾아오고 있습니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
-            { text: "집앞에 모르는 사람이 1시간째 서성이고 있습니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
-            { text: "매일 같은 시간에 누군가 저를 미행하는 것 같습니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
-            { text: "지속적인 스토킹 때문에 정신적으로 스트레스가 심합니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
-            { text: "원치 않는 연락을 계속하며 집앞까지 찾아왔습니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
-            { text: "전남친이 제가 만나는 사람을 몰래 미행하고 있습니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
-            { text: "협박성 문자를 지속적으로 보내며 괴롭히고 있습니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
-            { text: "집 주변을 배회하는 수상한 사람 때문에 불안합니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
-            { text: "모르는 사람이 계속 집앞에 서서 저를 지켜봅니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
-            { text: "스토킹으로 신고했던 가해자가 다시 주변을 맴돕니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
-            { text: "퇴근길에 계속 누군가 쫓아와서 뛰어서 도망쳤습니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
-            { text: "전여친이 수십 통의 부재중 전화와 협박 문자를 남겼습니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
-            { text: "밤마다 누군가 창문 밖을 서성이는 것 같아 찝찝합니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
-            { text: "헤어진 지 3개월 된 남친이 계속 찾아오고 있습니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
-            { text: "스토킹 고소 중인데 가해자가 계속 연락을 해옵니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
-            { text: "모르는 사람이 우편물과 선물을 집앞에 계속 두고 갑니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
-            { text: "지속적인 괴롭힘과 미행으로 인해 고통받고 있습니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
-            { text: "집 근처에서 저를 기다리고 있다가 갑자기 나타났습니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
-            { text: "거부 의사를 밝혔음에도 계속해서 쫓아옵니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
-            { text: "매일 발신번호 표시제한으로 전화가 와서 무시하고 있습니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
-            { text: "전남친이 제 동선과 일정을 모두 파악하고 미행합니다.", group: "🟠 [Mid Risk: 배회/스토킹 징후]" },
-
-            // High Risk (30건)
-            { text: "전남친이 칼을 들고 집 앞에 찾아와서 죽이겠다고 협박해요. 살려주세요!", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
-            { text: "스토킹 피해를 당하고 있어요. 너무 불안하고 무섭습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
-            { text: "모르는 사람이 창문을 깨고 침입하려고 합니다. 무섭습니다!", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
-            { text: "전남편이 흉기를 들고 찾아와서 가족들을 다 죽이겠다고 합니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
-            { text: "스토킹 가해자가 칼을 들고 길에서 저를 위협하고 있습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
-            { text: "낯선 남자가 저를 납치하려고 차에 강제로 태우려 했습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
-            { text: "집 안에 누군가 침입한 것 같아요. 너무 무서워서 숨어있습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
-            { text: "칼을 든 사람이 저를 쫓아옵니다. 무섭습니다, 빨리 와주세요!", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
-            { text: "동거남이 저를 방에 감금하고 폭행하고 있습니다. 살려주세요.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
-            { text: "헤어진 남친이 집 문을 부수고 침입해서 목을 졸랐습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
-            { text: "스토킹 가해자가 염산을 들고 찾아오겠다고 위협했습니다. 두렵습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
-            { text: "모르는 사람이 흉기로 저를 찌르려고 쫓아오고 있습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
-            { text: "전남친이 저를 차에 감금하고 어디론가 끌고 가고 있습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
-            { text: "무기를 든 남자가 아파트 복도에서 저를 기다리고 있습니다. 무서워요.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
-            { text: "스토커가 제 집에 몰래 침입해서 숨어있다가 칼을 꺼냈습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
-            { text: "전여친이 흉기를 들고 회사에 찾아와서 죽이겠다고 난동을 부립니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
-            { text: "살려주세요! 낯선 사람이 집 문을 강제로 열고 침입했습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
-            { text: "누군가 제 목을 조르고 폭행했습니다. 피를 많이 흘리고 있어요.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
-            { text: "스토킹 하던 사람이 저를 옥상으로 끌고 가 밀어버리려 합니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
-            { text: "가해자가 칼을 들이대고 소리지르면 죽이겠다고 협박합니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
-            { text: "집에 강도가 침입해서 칼로 가족들을 위협하고 있습니다. 무섭습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
-            { text: "전남편이 찾아와서 불을 지르겠다고 위협하고 있습니다. 두렵습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
-            { text: "납치를 당할 뻔했습니다. 간신히 도망쳤는데 계속 쫓아옵니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
-            { text: "흉기를 든 남자가 편의점에 침입해 점원을 인질로 잡고 있습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
-            { text: "스토커가 제 아이를 납치하겠다고 협박 전화를 했습니다. 무섭습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
-            { text: "살해 위협을 받고 있습니다. 지금 집앞에 흉기를 들고 서있습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
-            { text: "가해자가 저를 폭행하고 핸드폰을 빼앗아 감금했습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
-            { text: "집에 누군가 침입해서 칼로 저를 위협하며 돈을 요구합니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
-            { text: "전남친이 식칼을 들고 쫓아오고 있어요. 너무 두렵습니다, 살려주세요!", group: "🔴 [High Risk: 흉기/납치/살해 위협]" },
-            { text: "낯선 남자가 엘리베이터에 같이 타서 흉기를 꺼내들었습니다. 무섭습니다.", group: "🔴 [High Risk: 흉기/납치/살해 위협]" }
+        const scenariosData = [
+            {
+                "name": "시나리오 1: 전 연인의 집착 및 주거침입 흉기 난동",
+                "sentences": [
+                    "상담관님 안녕하세요, 오늘 날씨가 참 맑네요.",
+                    "퇴근하고 집에 와서 저녁을 먹으려던 참이었어요.",
+                    "냉장고를 열었는데 마땅히 먹을 게 없어서 배달을 시킬까 고민했어요.",
+                    "그런데 낮부터 모르는 번호로 부재중 전화가 몇 통 와 있더라고요.",
+                    "스팸 전화인 줄 알고 대수롭지 않게 넘겼습니다.",
+                    "TV를 켜고 예능 프로그램을 보면서 쉬고 있었어요.",
+                    "헤어진 지 6개월 정도 된 전 남자친구가 생각나긴 했지만 별생각 없었어요.",
+                    "그런데 갑자기 '집 앞이야'라는 짧은 문자가 한 통 오더라고요.",
+                    "헤어질 때 좋게 끝난 게 아니라서 조금 찝찝한 기분이 들었어요.",
+                    "혹시나 해서 인터폰 카메라로 현관 밖을 슬쩍 확인해봤습니다.",
+                    "복도에는 아무도 안 보여서 그냥 장난 문자였나 보다 하고 안심했어요.",
+                    "친구한테 전화해서 오늘 있었던 회사 일이나 수다를 떨었습니다.",
+                    "친구가 다음 주에 같이 여행 가자고 해서 일정을 잡고 있었어요.",
+                    "통화를 끝내고 샤워를 하려고 욕실로 들어갔습니다.",
+                    "씻고 나왔는데 베란다 창문 밖 골목길에서 익숙한 차가 서 있는 게 보였어요.",
+                    "전남친의 차량 번호판이 맞는지 안경을 쓰고 다시 확인해봤습니다.",
+                    "맞더라고요, 전남친 차가 제 원룸 건물 앞을 천천히 맴돌고 있었습니다.",
+                    "지속적으로 맴돌면서 제 방 창문을 올려다보는 것 같아 순간 소름이 돋았어요.",
+                    "불을 얼른 끄고 커튼을 쳤습니다.",
+                    "전화를 걸어 '왜 여기 있냐, 당장 가라'고 차분하게 말했어요.",
+                    "그 사람은 '얼굴만 잠깐 보고 얘기 좀 하자'면서 미안하다고 하더라고요.",
+                    "알겠으니까 내일 낮에 사람 많은 카페에서 보자고 달래서 보냈습니다.",
+                    "차 시동 소리가 나면서 골목을 빠져나가는 걸 보고 한숨을 돌렸어요.",
+                    "거실에 앉아서 따뜻한 차를 마시며 놀란 마음을 진정시켰습니다.",
+                    "내일 출근 준비를 위해 가방을 챙기고 옷을 다려두었어요.",
+                    "잠자리에 들려고 침대에 누워 휴대폰으로 알람을 맞췄습니다.",
+                    "한 30분쯤 지났을까요, 다시 카카오톡 알림이 울리기 시작했어요.",
+                    "'너 불 끈 거 다 알아', '딴 남자랑 같이 있는 거 아니지?'라는 메시지였어요.",
+                    "심장이 쿵쾅거리기 시작하고 너무 불안해서 손이 떨렸습니다.",
+                    "도대체 어디서 보고 있는 건지 주변을 둘러보아도 알 수가 없었어요.",
+                    "차단하겠다고 경고하고 번호를 차단했습니다.",
+                    "그러자 5분 뒤에 다른 발신번호 표시제한으로 계속 전화가 걸려왔습니다.",
+                    "무서워서 전화를 받지 않고 이불을 머리 끝까지 뒤집어썼어요.",
+                    "조금 조용해지길래 이제 포기하고 갔나 보다 생각했습니다.",
+                    "숨을 죽이고 거실 시계 초침 소리만 듣고 있었어요.",
+                    "그런데 갑자기 현관 도어락 비밀번호 누르는 '삐비빅' 소리가 들렸습니다.",
+                    "누군가 도어락을 강제로 열려고 틀린 번호를 계속 누르고 있었어요.",
+                    "경보음이 '삐- 삐-' 하고 시끄럽게 울리기 시작했습니다.",
+                    "문구멍(도어뷰)으로 다가가서 조심스럽게 밖을 내다봤습니다.",
+                    "전남친이 술에 만취한 상태로 현관문 손잡이를 미친 듯이 흔들고 있었어요.",
+                    "'문 열어! 안 열면 다 부숴버릴 거야!'라고 복도가 떠나가라 소리를 질렀어요.",
+                    "너무 무섭고 두려워서 눈물이 멈추지 않고 손이 덜덜 떨립니다.",
+                    "그 사람이 품 안에서 번쩍이는 식칼을 꺼내 들었어요!",
+                    "칼 손잡이로 현관 도어락을 사정없이 내리치며 부수려고 하고 있습니다!",
+                    "현관문 틈으로 칼날을 쑤셔 넣으면서 당장 죽여버리겠다고 협박하고 있어요!",
+                    "도어락이 부서져서 문이 열리기 직전입니다, 살려주세요!",
+                    "칼 들고 집 안으로 들어오려고 해요, 너무 무섭습니다!",
+                    "제발 경찰관분들 지금 당장 출동시켜 주세요!",
+                    "화장실로 도망쳐서 문 잠그고 숨어있겠습니다, 제발 빨리 와주세요!",
+                    "문이 부서졌어요! 살려주세요! 제발요!"
+                ]
+            },
+            {
+                "name": "시나리오 2: 가해자 감금/위협 중 배달 위장 112 신고",
+                "sentences": [
+                    "여보세요? 거기 짜장면집 맞죠? 삼선짜장 두 그릇 배달되나요?",
+                    "네, 맞아요. 단무지 많이 주시고 젓가락도 두 개 챙겨주세요.",
+                    "오늘 날씨가 추워서 따뜻한 짬뽕 국물도 조금만 서비스로 주시면 좋겠어요.",
+                    "제가 지금 [주소]에 있는 오피스텔 704호인데요.",
+                    "네, 맞아요. 704호 문 앞에 바로 벨 누르지 마시고 조용히 와주세요.",
+                    "결제는 만나서 카드로 할게요. 카드가 잘 안 긁힐 수도 있으니 리더기 꼭 챙겨오세요.",
+                    "지금 같이 있는 친구가 배가 많이 고파서 엄청 예민하거든요.",
+                    "네, 친구가 화를 잘 내는 편이라 빨리 와주셨으면 좋겠어요.",
+                    "아까부터 자꾸 집에 못 가게 하고 문 앞을 딱 막고 서 있네요.",
+                    "어디 안 가고 얌전히 시켜 먹을 테니까 문 좀 열어달라고 제가 사정했어요.",
+                    "사장님, 제 목소리 잘 들리시죠? 메뉴 주문 맞다니까요.",
+                    "주문서에 '스토킹'이라고 적어주실 수는 없나요? 특별 요청사항 있잖아요.",
+                    "아, 메뉴에 그런 건 없다고요? 그래도 꼭 메모란에 적어주세요.",
+                    "지금 손님 한 명이 칼 같은 걸 식탁 위에 올려두고 만지작거리고 있거든요.",
+                    "요리할 때 쓰는 주방용 칼 있잖아요, 그거랑 똑같이 생긴 거요.",
+                    "친구가 기분이 안 좋으면 물건을 던지거나 찌를 것처럼 위협을 해요.",
+                    "제가 지금 웃으면서 통화하고 있지만 사실 너무 무섭고 손이 떨려요.",
+                    "옆에서 '누구랑 그렇게 오래 통화하냐'고 노려보면서 묻네요.",
+                    "아, 가게 사장님이 주소를 잘 못 알아들으셔서 다시 말씀드리는 중이야.",
+                    "사장님, 배달원분 혼자 오시지 마시고 꼭 든든한 분들이랑 여럿이서 같이 와주세요.",
+                    "네, 파란 옷 입은 배달원분들이 사이렌 같은 거 켜지 말고 조용히 오셨으면 해요.",
+                    "지금 문을 강제로 열려고 하면 이 사람이 눈치채고 난리를 칠 거예요.",
+                    "제가 도망치려고 현관 쪽으로 갈 때마다 팔을 꺾고 소파에 밀쳐 넘어뜨렸어요.",
+                    "휴대폰도 뺏으려고 하는 걸 배달 주문한다고 겨우 우겨서 쥐고 있는 거예요.",
+                    "전화 끊지 마시고 제 말 계속 듣고 계셔주세요, 부탁드립니다.",
+                    "아, 군만두도 추가할게요. '코드 제로(CODE 0)' 세트로 부탁드려요.",
+                    "신고 접수된 거 맞죠? 제발 그렇다고 말씀해 주세요.",
+                    "이 사람이 며칠 전부터 제 출퇴근길을 계속 미행하고 미친 듯이 쫓아다녔어요.",
+                    "헤어지자고 했는데 제 주소를 알아내서 아까 계단에 숨어있다가 들이닥친 거예요.",
+                    "비밀번호 누르고 들어올 때 뒤에서 강제로 밀고 들어와서 저를 감금했어요.",
+                    "지금 나가지도 못하게 하고 감금된 상태로 3시간째 폭행당하고 있어요.",
+                    "얼굴이랑 팔에 멍이 너무 많이 들었고 입술도 터져서 피가 나요.",
+                    "친구가 지금 칼을 손에 쥐고 제 쪽으로 천천히 다가오고 있어요.",
+                    "'너 지금 누구랑 통화하냐'면서 눈빛이 완전히 돌변했어요.",
+                    "아니야, 진짜 배달 가게랑 통화하는 중이야, 제발 저리 가...",
+                    "사장님, 지금 당장 안 오시면 저 진짜 죽을지도 몰라요.",
+                    "흉기로 찌르겠다고 제 목에 칼을 들이대고 있어요!",
+                    "소리 지르면 목을 베어버리겠다고 협박해요, 살려주세요!",
+                    "말문이 막히고 숨을 못 쉬겠어요, 너무 무서워요!",
+                    "살려주세요, 704호예요! 문 강제로 부수고 들어오셔야 해요!",
+                    "칼로 제 팔을 베었어요! 피가 너무 많이 나요!",
+                    "꺄악! 살려주세요! 전화기 뺏으려고 해요!",
+                    "도와주세요! 흉기 들고 있어요! 살려주세요!",
+                    "경찰관님 제발 살려주세요! 704호예요!",
+                    "숨이 안 쉬어져요, 목을 조르고 있어요!",
+                    "빨리... 제발 빨리 문 열고 들어와 주세요...",
+                    "살려주세요... 살려주세요...",
+                    "쿵쿵거리는 소리 들려요... 제발...",
+                    "도와주세요...",
+                    "살려주세요!"
+                ]
+            },
+            {
+                "name": "시나리오 3: 직장 동료의 스토킹 및 배관 침입 폭행",
+                "sentences": [
+                    "경찰관님, 제가 너무 예민한 건지 상담 좀 드리려고 연락드렸습니다.",
+                    "같은 부서 직장 동료인 남성분이 계시는데요.",
+                    "업무적으로 자주 마주치는 사이라 평소에는 예의 바르게 대했습니다.",
+                    "그런데 얼마 전부터 퇴근 후에 자꾸 개인적인 카톡을 보내기 시작했어요.",
+                    "'오늘 입은 옷 잘 어울린다', '주말에 단둘이 영화 보자'는 내용이었어요.",
+                    "저는 사내 연애 생각이 없고 부담스러워서 정중하게 거절했습니다.",
+                    "거절한 뒤로는 회사에서 제 자리를 지나갈 때마다 빤히 쳐다보더라고요.",
+                    "처음에는 그냥 무안해서 그런가 보다 생각하고 넘기려 했습니다.",
+                    "그런데 며칠 전부터 제가 야근할 때마다 퇴근을 안 하고 기다리더라고요.",
+                    "지하철역까지 자꾸 따라오면서 같이 가자고 말을 걸었습니다.",
+                    "동선이 겹칠 수도 있겠다 싶어서 최대한 다른 칸으로 피해 탔어요.",
+                    "주말에 친구들이랑 집 근처 카페에 있었는데, 그 사람이 우연인 척 들어왔습니다.",
+                    "제가 사는 동네까지 어떻게 알고 찾아왔는지 너무 꺼림칙했어요.",
+                    "'여기 사시나 봐요?'라고 물었더니 그냥 지나가다 들렀다고 웃더군요.",
+                    "월요일에 회사에서 다른 직원들한테 제 집 주소를 묻고 다녔다는 말을 들었습니다.",
+                    "소름이 돋아서 회사 인사팀에 고충 상담을 넣을까 진지하게 고민했어요.",
+                    "그날 저녁 퇴근길에 뒤를 돌아보니 그 사람이 모자를 눌러쓰고 쫓아오고 있었습니다.",
+                    "제가 걸음을 빨리하면 같이 빨리 걷고, 멈추면 전봇대 뒤에 숨었어요.",
+                    "명백한 미행이었고, 스토킹을 당하고 있다는 공포감이 확 밀려왔습니다.",
+                    "원룸 건물 안으로 뛰어 들어가서 공동현관 문을 얼른 닫았습니다.",
+                    "유리문 밖에서 저를 무표정하게 응시하며 한동안 서 있더라고요.",
+                    "다음 날 회사에 출근해서 '더 이상 따라오지 마라, 신고하겠다'고 단호하게 경고했습니다.",
+                    "그러자 그 사람이 억울한 표정을 지으며 '좋아해서 그런 건데 너무하다'고 사과했습니다.",
+                    "다시는 안 그러겠다고 싹싹 빌길래 한 번 더 믿어보기로 했습니다.",
+                    "며칠 동안은 아무런 연락도 없고 조용해서 이제 끝났구나 싶었습니다.",
+                    "퇴근길도 평소처럼 안전했고 마음의 안정을 조금씩 되찾아가고 있었어요.",
+                    "주말 저녁에 집에서 편안하게 밀린 드라마를 보고 있었습니다.",
+                    "내일 월요일 회의 자료를 정리하려고 노트북을 켜고 작업을 시작했어요.",
+                    "그런데 자정쯤에 창문 방충망 쪽에서 바스락거리는 소리가 났습니다.",
+                    "제 방이 2층인데 가스 배관을 타고 올라오는 검은 그림자가 보였어요.",
+                    "불빛을 비춰보니 그 직장 동료 남자가 창문을 억지로 열려고 덜컹거리고 있었습니다.",
+                    "너무 놀라서 소리를 지르자 그 사람이 창문을 깨려고 쇠파이프로 내리쳤습니다!",
+                    "창문 유리에 쩍쩍 금이 가면서 깨지기 시작했어요.",
+                    "경찰에 신고하겠다고 소리쳤더니 '너 가지지 못하면 다 죽여버릴 거야!'라고 고함을 쳤습니다.",
+                    "깨진 유리창 틈으로 손을 집어넣어 안쪽 잠금장치를 풀려고 하고 있어요.",
+                    "손에서 피를 흘리면서도 광기 어린 눈빛으로 저를 노려보고 있습니다.",
+                    "가스 배관을 발로 차면서 쇠파이프로 방충망을 완전히 뜯어냈습니다.",
+                    "창문을 넘어 방 안으로 상체를 들이밀고 침입하고 있습니다!",
+                    "방 안에 둔 둔기를 들고 저를 때리려고 휘두르고 있어요!",
+                    "살려주세요! 집 안으로 완전히 들어왔습니다!",
+                    "머리채를 붙잡히고 바닥으로 내동댕이쳐졌어요, 살려주세요!",
+                    "목을 조르면서 벽에 머리를 찧고 있습니다, 숨을 못 쉬겠어요!",
+                    "제발 살려주세요! 흉기로 찌르겠다고 가방에서 칼을 꺼내고 있어요!",
+                    "경찰관님 제발 지금 당장 문 부수고 들어와 주세요!",
+                    "살려주세요! 죽을 것 같아요!",
+                    "피가 너무 많이 나요, 살려주세요!",
+                    "숨이 끊어질 것 같아요, 제발 도와주세요!",
+                    "빨리요... 제발요...",
+                    "살려주세요!",
+                    "도와주세요!"
+                ]
+            },
+            {
+                "name": "시나리오 4: 이웃 주민의 관음/감시 및 복도 흉기 난동",
+                "sentences": [
+                    "112 종합상황실이죠? 이웃 주민 갈등 관련해서 문의 좀 드릴게요.",
+                    "제가 복도식 아파트에 혼자 거주하고 있는 여성입니다.",
+                    "몇 달 전 옆집에 중년 남성이 새로 이사를 왔어요.",
+                    "엘리베이터나 복도에서 마주치면 가볍게 인사 정도는 나누는 사이였습니다.",
+                    "그런데 언제부터인가 제가 외출하거나 귀가할 때마다 옆집 문이 스르륵 열렸습니다.",
+                    "마치 현관문 외시경으로 저를 계속 지켜보고 있다가 타이밍을 맞추는 것 같았어요.",
+                    "복도에서 마주치면 '어디 갔다 오냐', '혼자 사는데 외롭지 않냐'고 물어보더라고요.",
+                    "그냥 사교성이 좋은 이웃인가 보다 생각하고 얼버무리며 피했습니다.",
+                    "그런데 제가 분리수거장에 내놓은 쓰레기봉투가 뜯겨져 있는 걸 발견했어요.",
+                    "제 이름과 전화번호가 적힌 택배 송장들이 사라져 있었습니다.",
+                    "찝찝해서 관리사무소에 CCTV 확인을 요청했는데 사각지대라 보이지 않았어요.",
+                    "그 뒤로 제 현관문 손잡이에 모르는 음료수나 쪽지가 걸려있기 시작했습니다.",
+                    "'친하게 지내고 싶다', '차 한잔하자'는 내용의 쪽지였어요.",
+                    "부담스러워서 쪽지를 떼어버리고 아무런 반응을 하지 않았습니다.",
+                    "그러자 며칠 뒤부터 밤마다 벽을 쿵쿵 치는 층간/벽간 소음이 발생했어요.",
+                    "새벽 2시, 3시에 벽을 주먹으로 치면서 욕설을 중얼거리는 소리가 들렸습니다.",
+                    "불안해서 며칠 동안 잠도 제대로 못 자고 신경쇠약에 걸릴 지경이었어요.",
+                    "관리소장님께 말씀드려서 옆집에 주의를 달라고 정중히 부탁드렸습니다.",
+                    "소장님이 다녀간 뒤로는 며칠 동안 벽 치는 소리가 멈추고 조용해졌어요.",
+                    "이제 갈등이 해결된 줄 알고 오랜만에 집에서 푹 쉴 수 있었습니다.",
+                    "집 청소도 하고 빨래도 돌리면서 평온한 주말을 보내고 있었어요.",
+                    "주말 오후에 배달 음식을 받으려고 현관문을 살짝 열었습니다.",
+                    "그런데 옆집 남자가 복도에 서서 제 현관문 안쪽을 집요하게 들여다보고 있었습니다.",
+                    "'왜 남의 집을 훔쳐보시냐'고 따졌더니 '네가 나를 신고해서 기분 나쁘다'며 적반하장으로 화를 냈습니다.",
+                    "말이 안 통하는 사람 같아서 문을 바로 닫고 잠갔습니다.",
+                    "그러자 문 밖에서 발로 현관문을 쾅쾅 차며 욕설을 퍼붓기 시작했어요.",
+                    "옆집 사람이 문 밖에서 30분 동안 서성거리며 중얼거리는 소리가 다 들렸습니다.",
+                    "지속적인 배회와 감시 때문에 공포심이 극에 달했습니다.",
+                    "한동안 조용하길래 포기하고 자기 집으로 들어간 줄 알았습니다.",
+                    "놀란 가슴을 진정시키며 거실에 웅크리고 앉아있었어요.",
+                    "그런데 갑자기 복도에서 쇠 긁는 끔찍한 소리가 나기 시작했습니다.",
+                    "옆집 남자가 대형 정글도(정원용 칼)를 들고 복도 바닥을 긁으며 걸어오고 있었어요!",
+                    "현관문 틈으로 그 모습을 보는 순간 온몸의 피가 얼어붙는 것 같았습니다.",
+                    "그 사람이 제 현관문을 칼로 사정없이 내리찍기 시작했습니다!",
+                    "'탕! 탕!' 소리와 함께 철제 현관문에 칼자국이 깊게 파이고 있습니다!",
+                    "'오늘 너 죽이고 나도 죽는다!'라며 광기에 차서 소리를 지르고 있어요!",
+                    "도어락 센서 부분이 칼날에 찍혀서 전원이 꺼지고 부서졌습니다!",
+                    "문이 덜컹거리며 틈이 벌어지기 시작했어요, 살려주세요!",
+                    "그 사람이 벌어진 문틈 사이로 흉기를 찔러 넣으며 문을 강제로 젖히고 있습니다!",
+                    "너무 무섭습니다, 심장이 터질 것 같아요! 살려주세요!",
+                    "손잡이가 완전히 뜯겨 나갔어요! 문이 열립니다!",
+                    "흉기를 들고 집 안으로 들어왔어요! 살려주세요!",
+                    "베란다로 도망쳐서 문을 잠갔는데 베란다 유리창을 칼로 깨고 있습니다!",
+                    "칼날이 제 얼굴 바로 앞까지 들어왔어요! 살려주세요!",
+                    "경찰관님 제발 살려주세요! 피할 곳이 없어요!",
+                    "유리 파편이 튀어서 온몸에 피가 나요!",
+                    "제발 지금 당장 와주세요! 살려주세요!",
+                    "문이 깨졌어요! 칼을 휘두르고 있어요!",
+                    "살려주세요! 꺄악!",
+                    "도와주세요! 살려주세요!"
+                ]
+            },
+            {
+                "name": "시나리오 5: 사이버 스토킹 미행 및 상가 납치 시도",
+                "sentences": [
+                    "상담사님, 인터넷 사이버 스토킹 때문에 상담 좀 받고 싶습니다.",
+                    "제가 소소하게 일상을 올리는 인스타그램 계정을 운영하고 있는데요.",
+                    "한 달 전부터 익명의 계정 하나가 제 모든 게시물에 좋아요를 누르기 시작했어요.",
+                    "처음에는 그냥 흔한 SNS 팔로워 중 한 명인 줄 알고 대수롭지 않게 여겼습니다.",
+                    "그런데 제가 올리지도 않은 제 실명과 나이, 직장 위치를 댓글로 달더라고요.",
+                    "무서워서 그 댓글을 바로 삭제하고 해당 계정을 차단했습니다.",
+                    "하지만 다음 날 또 다른 부계정을 만들어서 다이렉트 메시지(DM)를 보냈습니다.",
+                    "'차단하면 모를 줄 아냐', '오늘 입은 흰색 블라우스 예쁘더라'는 내용이었어요.",
+                    "소름이 돋아서 계정을 비공개로 전환하고 프로필 사진도 다 내렸습니다.",
+                    "친구들한테 물어봤더니 주변에 그런 사람이 없다고 해서 더 불안했어요.",
+                    "며칠 동안은 SNS 알림을 다 끄고 일상생활에 집중하려고 노력했습니다.",
+                    "회사 동료들과 점심을 먹고 커피를 마시면서 잠시 잊고 지냈어요.",
+                    "주말에는 집에서 밀린 청소를 하고 책을 읽으며 차분하게 시간을 보냈습니다.",
+                    "이제 사이버 스토킹이 잠잠해진 것 같아서 안심하고 있었어요.",
+                    "그런데 제 개인 핸드폰 번호로 사진 5장이 연속으로 전송되었습니다.",
+                    "사진을 열어보니 제가 출근하는 모습, 카페에 앉아있는 모습, 집 앞 편의점에 가는 모습이 찍혀있었습니다.",
+                    "누군가 제 뒤를 그림자처럼 쫓아다니며 몰래 도촬하고 있었던 거예요.",
+                    "손이 미친 듯이 떨리고 숨이 가빠져서 휴대폰을 떨어뜨릴 뻔했습니다.",
+                    "사진과 함께 '오늘 밤에 데리러 갈 테니 짐 싸둬라'는 협박 문자가 도착했습니다.",
+                    "너무 무서워서 집 근처 지구대로 바로 달려가 상담을 받으려고 집을 나섰습니다.",
+                    "아파트 계단을 내려와 주차장 쪽을 지나가는데 뒤에서 발소리가 들렸습니다.",
+                    "제가 걷는 속도에 맞춰서 뒤따라오는 발걸음 소리가 선명했어요.",
+                    "뒤를 돌아보지 않고 빠른 걸음으로 대로변 쪽을 향해 뛰기 시작했습니다.",
+                    "그런데 갑자기 검은색 카니발 승합차 한 대가 제 앞을 가로막으며 급정거했습니다.",
+                    "차 문이 열리더니 모자와 마스크를 쓴 건장한 남성이 내렸어요.",
+                    "그 사람이 제 팔을 낚아채며 강제로 차 안으로 끌고 들어가려고 했습니다!",
+                    "'사람 살려!'라고 소리를 질렀지만 주변에 지나가는 행인이 아무도 없었습니다.",
+                    "필사적으로 버티면서 핸드백으로 남자의 얼굴을 치고 뿌리쳤습니다.",
+                    "골목길 안쪽 상가 건물로 미친 듯이 도망쳐 들어갔습니다.",
+                    "상가 3층 여자 화장실 안쪽 칸으로 뛰어 들어가 문을 잠갔습니다.",
+                    "숨이 턱 끝까지 차오르고 온몸이 덜덜 떨려서 바닥에 주저앉았습니다.",
+                    "조용히 숨을 죽이고 있는데 상가 계단을 쿵쾅거리며 뛰어 올라오는 소리가 들렸어요.",
+                    "그 남자가 화장실 안으로 들어와 문들을 하나씩 발로 차며 열기 시작했습니다!",
+                    "'쾅! 쾅!' 소리가 나면서 제가 있는 칸 바로 앞까지 다가왔습니다.",
+                    "'숨는다고 모를 줄 알아? 좋은 말로 할 때 나와라'라며 문손잡이를 흔들었습니다.",
+                    "잠금장치를 부수려고 문을 어깨로 들이받고 발로 차고 있어요!",
+                    "문 위쪽 틈으로 남자의 눈이 보였습니다, 눈이 마주쳤어요!",
+                    "그 남자가 주머니에서 흉기와 테이프를 꺼내 들었습니다!",
+                    "화장실 문 잠금장치가 부서져서 문이 덜컹거리며 열리려고 합니다!",
+                    "살려주세요! 납치당하기 직전입니다, 너무 무섭고 두려워요!",
+                    "상가 화장실 문이 뜯겨 나갔어요! 살려주세요!",
+                    "남자가 제 입을 테이프로 막고 강제로 끌고 나가려 하고 있습니다!",
+                    "팔다리를 붙잡히고 질질 끌려가고 있어요, 살려주세요!",
+                    "칼로 제 허벅지를 찔렀어요! 피가 너무 많이 나요!",
+                    "경찰관님 제발 지금 당장 출동시켜 주세요, 살려주세요!",
+                    "차로 끌려가고 있어요! 살려주세요!",
+                    "숨을... 숨을 못 쉬겠어요...",
+                    "제발 살려주세요! 도와주세요!",
+                    "살려주세요!",
+                    "도와주세요!"
+                ]
+            }
         ];
 
         window.onload = function() {
             initChart();
-            initDropdown();
-            // GitHub Pages 로드 시 같은 경로에 있는 gardians_model.onnx 자동 Fetch 시도
-            autoLoadModelFromRepository();
+            updateSentenceDropdown();
+            autoLoadModel();
         };
 
-        // 💡 GitHub Pages 저장소에서 gardians_model.onnx 자동 로드 함수
-        async function autoLoadModelFromRepository() {
+        function switchLoadMode(mode) {
+            const btnWeb = document.getElementById('btnModeWeb');
+            const btnLocal = document.getElementById('btnModeLocal');
+            const localWrapper = document.getElementById('localFileWrapper');
+
+            if (mode === 'web') {
+                btnWeb.classList.add('active');
+                btnLocal.classList.remove('active');
+                localWrapper.style.display = 'none';
+                autoLoadModel();
+            } else {
+                btnLocal.classList.add('active');
+                btnWeb.classList.remove('active');
+                localWrapper.style.display = 'flex';
+                
+                const statusDot = document.getElementById('statusDot');
+                const statusText = document.getElementById('statusText');
+                statusDot.className = 'status-dot loading';
+                statusText.innerHTML = `💻 로컬 모드: <b>[파일 선택]</b> 버튼을 눌러 컴퓨터에 있는 <b>gardians_model.onnx</b> 파일을 선택하세요.`;
+                appendLog(`💻 로컬 모드가 활성화되었습니다. ONNX 파일을 직접 선택해주세요.`, 'system');
+            }
+        }
+
+        async function autoLoadModel() {
             const statusDot = document.getElementById('statusDot');
             const statusText = document.getElementById('statusText');
-            
-            // 상대 경로로 같은 폴더의 ONNX 파일 탐색
             const modelUrl = './gardians_model.onnx';
 
             try {
                 statusDot.className = 'status-dot loading';
-                statusText.innerText = '서버에서 gardians_model.onnx 파일을 로드하는 중...';
-
-                // URL로부터 ONNX 세션 직접 생성
+                statusText.innerText = '🌐 GitHub Pages 저장소에서 gardians_model.onnx 자동 탐색 중...';
                 session = await ort.InferenceSession.create(modelUrl);
-                
-                onModelLoadSuccess('gardians_model.onnx (자동 로드 완료)');
+                onModelLoadSuccess('gardians_model.onnx (원격 자동 로드 완료)');
             } catch (err) {
-                console.warn('자동 로드 실패 (로컬 파일 선택 필요):', err);
+                console.warn('자동 로드 실패:', err);
                 statusDot.className = 'status-dot error';
-                statusText.innerHTML = `⚠️ 자동 로드 실패: 모델 파일이 같은 폴더에 없거나 CORS 제한이 발생했습니다. 우측의 <b>[파일 직접 선택]</b>을 사용하세요.`;
-                appendLog(`⚠️ 원격 자동 로드 실패 (${err.message}). 우측 상단의 '파일 직접 선택'으로 업로드하세요.`, 'system error');
+                statusText.innerHTML = `⚠️ 원격 자동 로드 실패 (파일 없음/로컬 실행). 상단의 <b>[로컬 파일 모드]</b>를 선택하여 파일을 업로드하세요.`;
+                appendLog(`⚠️ 원격 자동 로드 실패 (${err.message}). 상단 '로컬 파일 모드'로 파일을 직접 선택해주세요.`, 'system error');
             }
         }
 
-        // 수동 파일 선택 핸들러
-        document.getElementById('manualModelUpload').addEventListener('change', async (event) => {
+        document.getElementById('localModelUpload').addEventListener('change', async (event) => {
             const file = event.target.files[0];
             if (!file) return;
 
@@ -387,13 +625,13 @@
             const statusText = document.getElementById('statusText');
 
             statusDot.className = 'status-dot loading';
-            statusText.innerText = `'${file.name}' 파일을 브라우저로 로드하는 중...`;
-            appendLog(`⏳ '${file.name}' 파일을 수동으로 로드하고 있습니다...`, 'system');
+            statusText.innerText = `💻 '${file.name}' 파일을 브라우저로 로드하는 중...`;
+            appendLog(`⏳ 로컬 파일 '${file.name}'을 로드하고 있습니다...`, 'system');
 
             try {
                 const arrayBuffer = await file.arrayBuffer();
                 session = await ort.InferenceSession.create(arrayBuffer);
-                onModelLoadSuccess(file.name);
+                onModelLoadSuccess(`${file.name} (로컬 파일 로드 완료)`);
             } catch (err) {
                 statusDot.className = 'status-dot error';
                 statusText.innerText = `❌ 로드 실패: ${err.message}`;
@@ -401,23 +639,184 @@
             }
         });
 
-        // 모델 로드 성공 시 공통 처리
         function onModelLoadSuccess(sourceName) {
             const statusDot = document.getElementById('statusDot');
             const statusText = document.getElementById('statusText');
 
             statusDot.className = 'status-dot ready';
-            statusText.innerText = `✅ 모델 준비 완료: ${sourceName} (입력: ${session.inputNames.join(', ')} / 출력: ${session.outputNames.join(', ')})`;
-            
-            appendLog(`✅ <b>${sourceName}</b> 모델 로드 성공! 실시간 분석이 활성화되었습니다.`, 'system');
+            statusText.innerText = `✅ 모델 준비 완료: ${sourceName}`;
+            appendLog(`✅ <b>${sourceName}</b> 모델 로드 성공! 시나리오를 선택하여 실시간 분석을 진행하세요.`, 'system');
 
-            document.getElementById('scenarioSelect').disabled = false;
-            document.getElementById('btnPreset').disabled = false;
-            document.getElementById('btnRandomOnce').disabled = false;
-            document.getElementById('btnAutoToggle').disabled = false;
+            document.getElementById('fullScenarioSelect').disabled = false;
+            document.getElementById('btnPlayScenario').disabled = false;
+            document.getElementById('btnNextSentence').disabled = false;
+            document.getElementById('sentenceSelect').disabled = false;
+            document.getElementById('btnSendSentence').disabled = false;
             document.getElementById('chatInput').disabled = false;
             document.getElementById('btnSend').disabled = false;
             document.getElementById('riskBadge').innerText = '준비 완료';
+        }
+
+        function onFullScenarioChange() {
+            if (scenarioIntervalId !== null) stopScenarioPlay();
+            currentScenarioIndex = parseInt(document.getElementById('fullScenarioSelect').value);
+            currentSentenceIndex = 0;
+            updateSentenceDropdown();
+            updateProgressBar();
+            appendLog(`📁 <b>[${scenariosData[currentScenarioIndex].name}]</b> 시나리오가 선택되었습니다.`, 'system');
+        }
+
+        function updateSentenceDropdown() {
+            const selectEl = document.getElementById('sentenceSelect');
+            selectEl.innerHTML = '';
+            const sentences = scenariosData[currentScenarioIndex].sentences;
+
+            sentences.forEach((sent, idx) => {
+                const opt = document.createElement('option');
+                opt.value = idx;
+                let short = sent.length > 38 ? sent.substring(0, 38) + '...' : sent;
+                opt.text = `[${idx + 1}/50] ${short}`;
+                selectEl.appendChild(opt);
+            });
+            selectEl.value = currentSentenceIndex;
+        }
+
+        function updateProgressBar() {
+            const container = document.getElementById('scenarioProgressContainer');
+            const bar = document.getElementById('scenarioProgressBar');
+            const txt = document.getElementById('scenarioProgressText');
+            
+            container.style.display = 'block';
+            txt.style.display = 'block';
+            
+            const pct = (currentSentenceIndex / 50) * 100;
+            bar.style.width = `${pct}%`;
+            txt.innerText = `진행도: ${currentSentenceIndex} / 50 문장`;
+        }
+
+        function playNextSentence() {
+            const sentences = scenariosData[currentScenarioIndex].sentences;
+            if (currentSentenceIndex >= sentences.length) {
+                appendLog(`🏁 <b>[${scenariosData[currentScenarioIndex].name}]</b> 시나리오(50문장)가 모두 완료되었습니다.`, 'system');
+                if (scenarioIntervalId !== null) stopScenarioPlay();
+                return false;
+            }
+
+            const text = sentences[currentSentenceIndex];
+            document.getElementById('sentenceSelect').value = currentSentenceIndex;
+            currentSentenceIndex++;
+            updateProgressBar();
+            sendText(text);
+            return true;
+        }
+
+        function toggleScenarioPlay() {
+            const btn = document.getElementById('btnPlayScenario');
+            const intervalInput = document.getElementById('scenarioIntervalInput');
+            
+            if (scenarioIntervalId !== null) {
+                stopScenarioPlay();
+            } else {
+                let sec = parseFloat(intervalInput.value);
+                if (isNaN(sec) || sec < 0.5) sec = 1.5;
+
+                btn.innerText = '⏹️ 시나리오 재생 중지';
+                btn.className = 'action-btn btn-danger';
+                intervalInput.disabled = true;
+                document.getElementById('fullScenarioSelect').disabled = true;
+                
+                appendLog(`▶️ <b>[${scenariosData[currentScenarioIndex].name}]</b> 연속 재생 시작 (${sec}초 간격)`, 'system');
+                
+                const hasNext = playNextSentence();
+                if (!hasNext) {
+                    currentSentenceIndex = 0;
+                    playNextSentence();
+                }
+
+                scenarioIntervalId = setInterval(() => {
+                    const ok = playNextSentence();
+                    if (!ok) stopScenarioPlay();
+                }, sec * 1000);
+            }
+        }
+
+        function stopScenarioPlay() {
+            if (scenarioIntervalId !== null) {
+                clearInterval(scenarioIntervalId);
+                scenarioIntervalId = null;
+            }
+            const btn = document.getElementById('btnPlayScenario');
+            btn.innerText = '▶️ 전체 시나리오 연속 실행';
+            btn.className = 'action-btn btn-info';
+            document.getElementById('scenarioIntervalInput').disabled = false;
+            document.getElementById('fullScenarioSelect').disabled = false;
+            appendLog('⏹️ 시나리오 연속 재생이 중지되었습니다.', 'system');
+        }
+
+        function sendSelectedSentence() {
+            const idx = parseInt(document.getElementById('sentenceSelect').value);
+            const sentences = scenariosData[currentScenarioIndex].sentences;
+            currentSentenceIndex = idx + 1;
+            updateProgressBar();
+            sendText(sentences[idx]);
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') sendManualText();
+        }
+
+        function sendManualText() {
+            const inputEl = document.getElementById('chatInput');
+            const text = inputEl.value.trim();
+            if (text) {
+                sendText(text);
+                inputEl.value = '';
+            }
+        }
+
+        async function sendText(text) {
+            if (!session) {
+                alert("모델이 아직 준비되지 않았습니다. 상단에서 모델을 로드해주세요.");
+                return;
+            }
+
+            appendLog(text, 'user');
+            
+            try {
+                const tensor = new ort.Tensor('string', [text], [1, 1]);
+                const inputName = session.inputNames[0];
+                const feeds = {};
+                feeds[inputName] = tensor;
+                
+                const results = await session.run(feeds);
+                let raw_score = 0.0;
+                
+                if (session.outputNames.length > 1) {
+                    const probName = session.outputNames[1];
+                    const probs = results[probName].data;
+                    // [0.1, 0.45, 0.85] 확률 가중합
+                    raw_score = (probs[0] * 0.1) + (probs[1] * 0.45) + (probs[2] * 0.85);
+                } else {
+                    const outputName = session.outputNames[0];
+                    raw_score = results[outputName].data[0];
+                }
+
+                let risk_score = Math.min(1.0, Math.max(0.0, Math.round(raw_score * 10) / 10));
+                let level = Math.floor(risk_score * 10);
+                
+                updateDashboard(risk_score, level);
+                
+                // 위험도에 따른 이모지 분류 (0.0~0.3: 🟢, 0.3~0.7: 🟡, 0.7~1.0: 🔴)
+                let emoji = '🟢';
+                if (risk_score >= 0.7) emoji = '🔴';
+                else if (risk_score >= 0.3) emoji = '🟡';
+                
+                appendLog(`${emoji} [분석 완료] 예측 위험도: ${risk_score.toFixed(1)} (Level ${level} / 10)`, 'system');
+
+            } catch (err) {
+                console.error(err);
+                appendLog(`분석 오류: ${err.message}`, 'system error');
+            }
         }
 
         function initChart() {
@@ -434,8 +833,8 @@
                         borderWidth: 2,
                         pointBackgroundColor: historyData.colors,
                         pointBorderColor: '#fff',
-                        pointRadius: 5,
-                        pointHoverRadius: 7,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
                         tension: 0.3,
                         fill: true
                     }]
@@ -450,7 +849,7 @@
                             ticks: { stepSize: 0.2, font: { weight: 'bold' } },
                             grid: { color: '#f1f3f5' }
                         },
-                        x: { grid: { display: false } }
+                        x: { grid: { display: false }, ticks: { maxTicksLimit: 15 } }
                     },
                     plugins: {
                         legend: { display: false },
@@ -480,122 +879,6 @@
             appendLog('📊 누적 위험도 추이 그래프가 초기화되었습니다.', 'system');
         }
 
-        function initDropdown() {
-            const selectEl = document.getElementById("scenarioSelect");
-            selectEl.innerHTML = "";
-            let currentGroup = "";
-            let optgroup = null;
-
-            scenarios.forEach((s, idx) => {
-                if (s.group !== currentGroup) {
-                    currentGroup = s.group;
-                    optgroup = document.createElement("optgroup");
-                    optgroup.label = currentGroup;
-                    selectEl.appendChild(optgroup);
-                }
-                const option = document.createElement("option");
-                option.value = s.text;
-                let shortText = s.text.length > 35 ? s.text.substring(0, 35) + "..." : s.text;
-                option.text = `[${idx+1}] ` + shortText;
-                optgroup.appendChild(option);
-            });
-        }
-
-        function sendSelected() {
-            const selectEl = document.getElementById("scenarioSelect");
-            if (selectEl.value) sendText(selectEl.value);
-        }
-
-        function sendRandomOnce() {
-            const randomIndex = Math.floor(Math.random() * scenarios.length);
-            const item = scenarios[randomIndex];
-            document.getElementById("scenarioSelect").value = item.text;
-            sendText(item.text);
-        }
-
-        function toggleAutoSimulation() {
-            const btn = document.getElementById('btnAutoToggle');
-            const intervalInput = document.getElementById('intervalInput');
-            
-            if (autoIntervalId !== null) {
-                clearInterval(autoIntervalId);
-                autoIntervalId = null;
-                btn.innerText = '▶️ 자동 랜덤 입력 시작';
-                btn.classList.remove('running');
-                intervalInput.disabled = false;
-                appendLog('⏹️ 자동 랜덤 시뮬레이션이 중지되었습니다.', 'system');
-            } else {
-                let sec = parseFloat(intervalInput.value);
-                if (isNaN(sec) || sec < 0.5) sec = 3;
-                
-                intervalInput.disabled = true;
-                btn.innerText = '⏹️ 자동 시뮬레이션 중지';
-                btn.classList.add('running');
-                appendLog(`▶️ 자동 랜덤 시뮬레이션 시작 (주기: ${sec}초)`, 'system');
-
-                sendRandomOnce();
-                autoIntervalId = setInterval(() => {
-                    sendRandomOnce();
-                }, sec * 1000);
-            }
-        }
-
-        function handleKeyPress(event) {
-            if (event.key === 'Enter') sendManualText();
-        }
-
-        function sendManualText() {
-            const inputEl = document.getElementById('chatInput');
-            const text = inputEl.value.trim();
-            if (text) {
-                sendText(text);
-                inputEl.value = '';
-            }
-        }
-
-        async function sendText(text) {
-            if (!session) {
-                alert("모델이 아직 준비되지 않았습니다.");
-                return;
-            }
-
-            appendLog(text, 'user');
-            
-            try {
-                const tensor = new ort.Tensor('string', [text], [1, 1]);
-                const inputName = session.inputNames[0];
-                const feeds = {};
-                feeds[inputName] = tensor;
-                
-                const results = await session.run(feeds);
-                let raw_score = 0.0;
-                
-                if (session.outputNames.length > 1) {
-                    const probName = session.outputNames[1];
-                    const probs = results[probName].data;
-                    raw_score = (probs[0] * 0.1) + (probs[1] * 0.6) + (probs[2] * 0.9);
-                } else {
-                    const outputName = session.outputNames[0];
-                    raw_score = results[outputName].data[0];
-                }
-
-                let risk_score = Math.min(1.0, Math.max(0.0, Math.round(raw_score * 10) / 10));
-                let level = Math.floor(risk_score * 10);
-                
-                updateDashboard(risk_score, level);
-                
-                let emoji = '🟢';
-                if (level >= 8) emoji = '🔴';
-                else if (level >= 5) emoji = '🟡';
-                
-                appendLog(`${emoji} [분석 완료] 예측 위험도: ${risk_score.toFixed(1)} (Level ${level} / 10)`, 'system');
-
-            } catch (err) {
-                console.error(err);
-                appendLog(`분석 중 오류 발생: ${err.message}`, 'system error');
-            }
-        }
-
         function appendLog(text, sender) {
             const container = document.getElementById('logContainer');
             const timeStr = new Date().toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -609,7 +892,7 @@
             
             const metaDiv = document.createElement('div');
             metaDiv.className = 'log-meta';
-            metaDiv.innerText = sender === 'user' ? `접수 내용 • ${timeStr}` : `AI 분석 • ${timeStr}`;
+            metaDiv.innerText = sender === 'user' ? `신고자 • ${timeStr}` : `AI 가디언즈 • ${timeStr}`;
             
             itemDiv.appendChild(bubbleDiv);
             itemDiv.appendChild(metaDiv);
@@ -623,18 +906,20 @@
             const riskText = document.getElementById('riskText');
             const riskBadge = document.getElementById('riskBadge');
             
+            // 바늘 각도 계산: 0.0 -> -90deg, 0.5 -> 0deg, 1.0 -> +90deg
             const angle = (risk_score * 180) - 90;
             needle.style.transform = `rotate(${angle}deg)`;
             
+            // 위험도 라벨 정의: 저위험(0.0~0.3), 중위험(0.3~0.7), 고위험(0.7~1.0)
             let color = '#51cf66';
-            let badgeText = '일반 / 안전 (자체종결)';
+            let badgeText = '저위험 / 안전 (0.0~0.3)';
             
-            if (level >= 8) {
+            if (risk_score >= 0.7) {
                 color = '#ff6b6b';
-                badgeText = '긴급 / 심각 (즉각 출동)';
-            } else if (level >= 5) {
+                badgeText = '고위험 / 긴급 (0.7~1.0)';
+            } else if (risk_score >= 0.3) {
                 color = '#fcc419';
-                badgeText = '위험 / 경계 (주시 필요)';
+                badgeText = '중위험 / 경계 (0.3~0.7)';
             }
             
             riskBadge.style.backgroundColor = color;
@@ -645,11 +930,11 @@
             const timeStr = new Date().toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
             const count = historyData.values.length + 1;
             
-            historyData.labels.push(`#${count} (${timeStr})`);
+            historyData.labels.push(`#${count}`);
             historyData.values.push(risk_score);
             historyData.colors.push(color);
 
-            if (historyData.labels.length > 30) {
+            if (historyData.labels.length > 55) {
                 historyData.labels.shift();
                 historyData.values.shift();
                 historyData.colors.shift();
