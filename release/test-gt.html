@@ -165,7 +165,7 @@
 </head>
 <body>
     <div class="header">
-        <h1>🚨 가디언즈(Gardians) 실시간 위험도 모니터링</h1>
+        <h1>🚨 가디언즈(Guardians) 실시간 위험도 모니터링</h1>
         <p>GitHub Pages 원격 자동 로드 및 로컬 ONNX 모델 직접 업로드 지원 시스템</p>
     </div>
 
@@ -271,7 +271,7 @@
                 <h3>상황 로그 및 실시간 분석 (Chat Log)</h3>
                 <div class="log-container" id="logContainer">
                     <div class="log-item system">
-                        <div class="bubble system">✅ <b>gardians_model.onnx</b> 모델을 준비하고 있습니다...</div>
+                        <div class="bubble system">✅ <b>Guardians_model.onnx</b> 모델을 준비하고 있습니다...</div>
                     </div>
                 </div>
                 
@@ -594,7 +594,7 @@
                 const statusDot = document.getElementById('statusDot');
                 const statusText = document.getElementById('statusText');
                 statusDot.className = 'status-dot loading';
-                statusText.innerHTML = `💻 로컬 모드: <b>[파일 선택]</b> 버튼을 눌러 컴퓨터에 있는 <b>gardians_model.onnx</b> 파일을 선택하세요.`;
+                statusText.innerHTML = `💻 로컬 모드: <b>[파일 선택]</b> 버튼을 눌러 컴퓨터에 있는 <b>Guardians_model.onnx</b> 파일을 선택하세요.`;
                 appendLog(`💻 로컬 모드가 활성화되었습니다. ONNX 파일을 직접 선택해주세요.`, 'system');
             }
         }
@@ -602,13 +602,13 @@
         async function autoLoadModel() {
             const statusDot = document.getElementById('statusDot');
             const statusText = document.getElementById('statusText');
-            const modelUrl = './gardians_model.onnx';
+            const modelUrl = './Guardians_model.onnx';
 
             try {
                 statusDot.className = 'status-dot loading';
-                statusText.innerText = '🌐 GitHub Pages 저장소에서 gardians_model.onnx 자동 탐색 중...';
+                statusText.innerText = '🌐 GitHub Pages 저장소에서 Guardians_model.onnx 자동 탐색 중...';
                 session = await ort.InferenceSession.create(modelUrl);
-                onModelLoadSuccess('gardians_model.onnx (원격 자동 로드 완료)');
+                onModelLoadSuccess('Guardians_model.onnx (원격 자동 로드 완료)');
             } catch (err) {
                 console.warn('자동 로드 실패:', err);
                 statusDot.className = 'status-dot error';
