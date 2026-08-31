@@ -4,14 +4,14 @@ import os
 import pandas as pd
 
 # ==============================================================================
-# 가디언즈(Gardians) ONNX 모델 직접 추론 테스트 스크립트 (로컬 실행용, 원본 그대로)
+# 가디언즈(Guardians) ONNX 모델 직접 추론 테스트 스크립트 (로컬 실행용, 원본 그대로)
 # ==============================================================================
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = os.path.join(BASE_DIR, "gardians_model.onnx")
+MODEL_PATH = os.path.join(BASE_DIR, "Guardians_model.onnx")
 
 print("=" * 80)
-print("🛡️ Gardians Model 대규모 로컬 테스트 시작 (110건 시나리오)")
+print("🛡️ Guardians Model 대규모 로컬 테스트 시작 (110건 시나리오)")
 print("=" * 80)
 
 # 1. 모델 로드
