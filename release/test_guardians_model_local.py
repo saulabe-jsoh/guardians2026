@@ -8,7 +8,7 @@ import pandas as pd
 # ==============================================================================
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = os.path.join(BASE_DIR, "Guardians_model.onnx")
+MODEL_PATH = os.path.join(BASE_DIR, "guardians_model.onnx")
 
 print("=" * 80)
 print("🛡️ Guardians Model 대규모 로컬 테스트 시작 (110건 시나리오)")
