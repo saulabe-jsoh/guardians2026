@@ -1,5 +1,5 @@
 
-# 가디언즈(Gardians) 실시간 위험도 모니터링 시스템
+# 가디언즈(Guardians) 실시간 위험도 모니터링 시스템
 
 이 프로젝트는 112 신고 접수 내용 및 대화 텍스트를 기반으로 **스토킹 등 범죄 위험도를 실시간으로 분류하는 AI 시스템**입니다. 
 Scikit-learn 기반의 Logistic Regression(TF-IDF) 모델을 학습하여 ONNX 형식으로 변환한 뒤, 파이썬 로컬 환경 또는 웹 브라우저 상에서 서버 없이 직접 추론을 수행합니다.
@@ -12,10 +12,10 @@ Scikit-learn 기반의 Logistic Regression(TF-IDF) 모델을 학습하여 ONNX �
 ├── README.md                                 # 프로젝트 설명서 (현재 파일)
 ├── requirements.txt                          # 파이썬 의존성 패키지 목록
 ├── run.bat                                   # 로컬 테스트 스크립트 실행 배치 파일
-├── train_gardians_model.py                   # (선택) ONNX 모델 학습 스크립트
-├── test_gardians_model_local_2.py            # 로컬 110건 추론 및 테스트 스크립트
+├── train_guardians_model.py                   # (선택) ONNX 모델 학습 스크립트
+├── test_guardians_model_local_2.py            # 로컬 110건 추론 및 테스트 스크립트
 ├── index.html                                # 웹 브라우저 단독 실행용 모니터링 대시보드
-├── gardians_model.onnx                       # 훈련된 위험도 분류 AI 모델
+├── guardians_model.onnx                       # 훈련된 위험도 분류 AI 모델
 └── data/                                     # 학습 데이터 (CSV, XLSX 등)
 
 # 실행 방법
@@ -35,9 +35,9 @@ Bash
 
 pip install -r requirements.txt
 
-🏃 2. 로컬 테스트 실행 (test_gardians_model_local_2.py)
+🏃 2. 로컬 테스트 실행 (test_guardians_model_local_2.py)
 
-학습된 gardians_model.onnx 모델이 정상적으로 작동하는지 확인하는 과정입니다.
+학습된 guardians_model.onnx 모델이 정상적으로 작동하는지 확인하는 과정입니다.
 
 실행 방법 1: 배치 파일 사용 (run.bat)윈도우 환경에서는 프로젝트 폴더 내의 run.bat 파일을 더블클릭하여 바로 테스트를 실행할 수 있습니다. 
 
@@ -47,7 +47,7 @@ pip install -r requirements.txt
 
 Bash
 
-python test_gardians_model_local_2.py
+python test_guardians_model_local_2.py
 
 동작 원리
 
@@ -65,11 +65,11 @@ onnxruntime-web 라이브러리를 사용하여 브라우저 내부에서 실시
 
 GitHub Pages (웹 호스팅 모드): https://saulabe-jsoh.github.io/guardians2026/release/test-gt.html
 
-프로젝트 폴더를 GitHub Pages로 배포할 때, index.html과 gardians_model.onnx 파일을 같은 경로에 둡니다. 
+프로젝트 폴더를 GitHub Pages로 배포할 때, index.html과 guardians_model.onnx 파일을 같은 경로에 둡니다. 
 
 웹 접속 시 모델을 자동 탐색하여 로드합니다.로컬 파일 모드:내 컴퓨터에서 index.html을 브라우저로 바로 엽니다 (더블클릭).
 
-상단의 [💻 로컬 파일 모드]를 클릭하고 [파일 선택] 버튼을 눌러 gardians_model.onnx 파일을 직접 선택합니다.
+상단의 [💻 로컬 파일 모드]를 클릭하고 [파일 선택] 버튼을 눌러 guardians_model.onnx 파일을 직접 선택합니다.
 
 주요 기능반원형 스피도미터 계기판: 실시간 위험도에 따라 초록(안전) >> 노랑(경계) >> 빨강(긴급) 3단계로 바늘이 회전합니다.
 
@@ -79,7 +79,7 @@ GitHub Pages (웹 호스팅 모드): https://saulabe-jsoh.github.io/guardians202
 
 누적 추이 차트: Chart.js를 연동하여 입력된 사건별 누적 위험도 시계열 흐름을 꺾은선으로 가시화합니다.
 
-🧠 4. 모델 재학습 (Optional)※ 이미 학습된 gardians_model.onnx 파일이 존재할 경우 생략 가능합니다.
+🧠 4. 모델 재학습 (Optional)※ 이미 학습된 guardians_model.onnx 파일이 존재할 경우 생략 가능합니다.
 
 모델을 처음부터 다시 학습하려면, 학습 데이터가 존재하는지 확인한 후 학습 스크립트를 실행합니다.
 
