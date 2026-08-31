@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Gardians 위험도 분류 모델 학습 스크립트 (로컬 실행용)
+Guardians 위험도 분류 모델 학습 스크립트 (로컬 실행용)
 
 데이터 소스:
   1) peaceful_data_generated.csv       -> 저위험(label 0, 목표 스코어 0.1)
@@ -13,7 +13,7 @@ Gardians 위험도 분류 모델 학습 스크립트 (로컬 실행용)
 스토킹 기록 두 파일에는 위험도 정답 컬럼이 없음. 신고내용/종결내용에 폭력·흉기·
 살해·납치 등 키워드가 있으면 고위험(label 2, 0.8), 없으면 중위험(label 1, 0.4)으로
 약지도(weak supervision) 라벨을 부여한다. 이 키워드는 팀이 이미 작성한
-test_gardians_model-1.txt 의 Mid/High Risk 예시 문장에서 그대로 가져온 것이라
+test_Guardians_model-1.txt 의 Mid/High Risk 예시 문장에서 그대로 가져온 것이라
 새로 임의 기준을 만드는 것이 아니다.
 
 편향 점검을 위해 아래를 수행한다:
@@ -24,10 +24,10 @@ test_gardians_model-1.txt 의 Mid/High Risk 예시 문장에서 그대로 가져
     실제 서비스 입력(플레이스홀더 없는 자연문)에서 엉뚱하게 동작하는 원인)
   - 클래스별 샘플 수 출력 + class_weight='balanced'
   - 학습/평가 분리 후 per-class precision/recall/F1, confusion matrix 출력
-  - 팀이 만든 110건 큐레이션 샘플(test_gardians_model-1.txt)로 최종 캘리브레이션 점검
+  - 팀이 만든 110건 큐레이션 샘플(test_Guardians_model-1.txt)로 최종 캘리브레이션 점검
 
 버전 이력:
-  -1 (원본): 이름은 "학습 스크립트"였지만 실제로는 test_gardians_model-1.txt와
+  -1 (원본): 이름은 "학습 스크립트"였지만 실제로는 test_Guardians_model-1.txt와
       동일한 추론/테스트 코드만 있었고, 실제 학습 로직은 없었음.
   -2 (이 파일): 실제 학습 파이프라인. 아래를 거쳐 완성됨.
       1) 학습 데이터를 CTGAN 신고 기록으로만 구성 -> held-out 성능은 좋았지만
@@ -63,12 +63,12 @@ CTGAN_FILES = [
     os.path.join(BASE_DIR, "synthetic_ctgan_1000_gpt-4-turbo.xlsx"),
     os.path.join(BASE_DIR, "synthetic_ctgan_1000_roberta-large-ner.xlsx"),
 ]
-MODEL_OUT = os.path.join(BASE_DIR, "gardians_model.onnx")
+MODEL_OUT = os.path.join(BASE_DIR, "Guardians_model.onnx")
 
 # 위험도 라벨 정의 (중위험: 0.4, 고위험: 0.8)
 LABEL_NAMES = {0: "저위험(0.1)", 1: "중위험(0.4)", 2: "고위험(0.8)"}
 
-# test_gardians_model-1.txt 의 High Risk 블록(30건)에서 실제 등장한 위협 어휘 기반
+# test_Guardians_model-1.txt 의 High Risk 블록(30건)에서 실제 등장한 위협 어휘 기반
 HIGH_RISK_KEYWORDS = [
     "칼", "흉기", "식칼", "죽이", "죽인다", "살해", "살려주세요", "살려줘", "살려",
     "도와주세요", "도와줘", "구해주세요", "납치", "감금", "침입", "인질", "목을 조르",
@@ -168,7 +168,7 @@ def dedupe_report(df, name):
 
 def main():
     print("=" * 80)
-    print("Gardians 모델 학습 시작 (저위험: 0.1 / 중위험: 0.4 / 고위험: 0.8)")
+    print("Guardians 모델 학습 시작 (저위험: 0.1 / 중위험: 0.4 / 고위험: 0.8)")
     print("=" * 80)
 
     peaceful = load_peaceful()
