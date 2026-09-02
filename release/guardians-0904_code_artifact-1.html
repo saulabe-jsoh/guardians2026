@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>가디언즈(Guardians) 프로그램 아키텍처 다이어그램 캔버스</title>
+    <style>
+        :root {
+            --bg-deep: #080e1e;
+            --bg-card: #111c33;
+            --border: #233554;
+            --accent-cyan: #38bdf8;
+            --accent-green: #34d399;
+            --accent-yellow: #fbbf24;
+            --accent-purple: #c084fc;
+            --accent-red: #f87171;
+            --text-main: #f8fafc;
+            --text-sub: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-deep);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        header {
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            padding: 14px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-box {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, #0284c7, #38bdf8);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: 800;
+            box-shadow: 0 0 14px rgba(56, 189, 248, 0.4);
+        }
+
+        .title-box h1 {
+            font-size: 17px;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+        }
+
+        .title-box p {
+            font-size: 12px;
+            color: var(--text-sub);
+        }
+
+        .nav-switch {
+            display: flex;
+            background: #0b1329;
+            padding: 4px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            gap: 6px;
+        }
+
+        .switch-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-sub);
+            padding: 8px 18px;
+            font-size: 13px;
+            font-weight: 700;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .switch-btn:hover {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .switch-btn.active {
+            background: var(--accent-cyan);
+            color: #041226;
+            box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
+        }
+
+        main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1.25fr 0.75fr;
+            gap: 20px;
+            padding: 20px 24px;
+            max-width: 1750px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        @media (max-width: 1100px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .canvas-container {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        .canvas-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding: 0 4px;
+        }
+
+        .canvas-title-area {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .badge-mode {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 4px;
+            background: rgba(56, 189, 248, 0.15);
+            color: var(--accent-cyan);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+        }
+
+        .canvas-viewport {
+            position: relative;
+            flex: 1;
+            min-height: 560px;
+            background: #060a14;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            overflow: hidden;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .canvas-notice {
+            position: absolute;
+            bottom: 12px;
+            right: 14px;
+            font-size: 11px;
+            color: rgba(148, 163, 184, 0.7);
+            pointer-events: none;
+        }
+
+        .info-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 22px;
+            overflow-y: auto;
+            max-height: calc(100vh - 105px);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        .info-panel h2 {
+            font-size: 20px;
+            font-weight: 800;
+            margin-bottom: 6px;
+        }
+
+        .info-panel .subtitle {
+            font-size: 13px;
+            color: var(--text-sub);
+            margin-bottom: 20px;
+            line-height: 1.5;
+            padding-bottom: 14px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .spec-box {
+            margin-bottom: 18px;
+            background: rgba(15, 23, 42, 0.6);
+            padding: 14px 16px;
+            border-radius: 8px;
+            border-left: 4px solid var(--accent-cyan);
+        }
+
+        .spec-box.green { border-left-color: var(--accent-green); }
+        .spec-box.purple { border-left-color: var(--accent-purple); }
+        .spec-box.yellow { border-left-color: var(--accent-yellow); }
+        .spec-box.red { border-left-color: var(--accent-red); }
+
+        .spec-title {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 6px;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .spec-desc {
+            font-size: 12.5px;
+            color: #cbd5e1;
+            line-height: 1.6;
+        }
+
+        .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+
+        .summary-table th, .summary-table td {
+            padding: 7px 10px;
+            border: 1px solid var(--border);
+            text-align: left;
+        }
+
+        .summary-table th {
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--accent-cyan);
+            font-weight: 600;
+        }
+
+        #graphTooltip {
+            position: absolute;
+            background: rgba(15, 23, 42, 0.95);
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s;
+            border: 1px solid var(--accent-cyan);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+            z-index: 1000;
+            max-width: 250px;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-brand">
+            <div class="logo-box">🛡️</div>
+            <div class="title-box">
+                <h1>가디언즈(Guardians) 프로그램 아키텍처 다이어그램</h1>
+                <p>경찰 내부망 전용 2단계 비식별화 및 초경량 온디바이스 음절 임베딩 파이프라인</p>
+            </div>
+        </div>
+        <div class="nav-switch">
+            <button id="btnDiagram1" class="switch-btn active" onclick="switchDiagram(1)">
+                <span>🔒</span> 1. 비식별화 모듈 구조도
+            </button>
+            <button id="btnDiagram2" class="switch-btn" onclick="switchDiagram(2)">
+                <span>🔄</span> 2. 비식별화 파이프라인
+            </button>
+            <button id="btnDiagram3" class="switch-btn" onclick="switchDiagram(3)">
+                <span>⚡</span> 3. 음절 모델 모듈 구조도
+            </button>
+            <button id="btnDiagram4" class="switch-btn" onclick="switchDiagram(4)">
+                <span>🚀</span> 4. 실시간 추론 파이프라인
+            </button>
+        </div>
+    </header>
+
+    <main>
+        <div class="canvas-container">
+            <div class="canvas-toolbar">
+                <div class="canvas-title-area">
+                    <span id="diagIcon">🔒</span>
+                    <h3 id="diagTitle" style="font-size:15px; font-weight:700;">하이브리드 비식별화 서브시스템 구조도</h3>
+                </div>
+                <span class="badge-mode" id="diagTag">경찰 내부망 폐쇄환경</span>
+            </div>
+            <div class="canvas-viewport">
+                <canvas id="architectureCanvas"></canvas>
+                <div class="canvas-notice">💡 각 모듈 노드에 마우스를 올려 내부 입출력 구조를 확인하세요.</div>
+                <div id="graphTooltip"></div>
+            </div>
+        </div>
+
+        <div class="info-panel" id="panelContent">
+            <!-- 동적 해설 패널 -->
+        </div>
+    </main>
+
+    <script>
+        let activeDiagram = 1;
+        const canvas = document.getElementById('architectureCanvas');
+        const ctx = canvas.getContext('2d');
+        const tooltip = document.getElementById('graphTooltip');
+
+        let nodes = [];
+        let links = [];
+        let hoveredNode = null;
+        let particles = [];
+        let animId = null;
+
+        function resizeCanvas() {
+            const wrapper = canvas.parentElement;
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = wrapper.clientWidth * dpr;
+            canvas.height = wrapper.clientHeight * dpr;
+            ctx.scale(dpr, dpr);
+            drawScene();
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        const diagramDescriptions = {
+            1: {
+                title: "하이브리드 비식별화 서브시스템 모듈 구조도 (Module Architecture)",
+                subtitle: "경찰 내부망(폐쇄망) 환경에서 민감한 112 신고 데이터의 물리적 유출을 방지하고 재식별을 원천 차단하는 6대 핵심 소프트웨어 모듈 구조도입니다.",
+                specs: [
+                    {
+                        color: "cyan",
+                        title: "1) Module 1: 보안 복호화 인메모리 로더 (Secure In-Memory Decryptor)",
+                        desc: "<code>msoffcrypto-tool</code> 엔진을 사용하여 암호화된 112 원본 엑셀 파일을 <code>io.BytesIO</code> 인메모리 바이너리 스트림으로 직접 복호화합니다. 로컬 디스크에 임시 파일(Temp File)을 생성하지 않아 파일 복구 및 포렌식을 통한 유출 위험을 0%로 통제합니다."
+                    },
+                    {
+                        color: "cyan",
+                        title: "2) Module 2: 정형 속성 규칙 마스커 (Structured Column Masker)",
+                        desc: "신고전화번호, 상세주소, X/Y좌표, 접수자/지령자/종결자 사번 등 38개 정형 메타데이터 컬럼을 Pandas 벡터 연산으로 일괄 <code>[비식별화]</code> 치환하고, 발생 주소는 구·동 단위까지만 절삭 보존합니다."
+                    },
+                    {
+                        color: "purple",
+                        title: "3) Module 3 & 4: 2단계 하이브리드 비정형 마스커 (Regex + Local RoBERTa NER)",
+                        desc: "<b>• Module 3 (Regex Engine):</b> 주민번호, 전화번호, 차량번호 등 고정 패턴 68.2% 1차 선제 마스킹.<br><b>• Module 4 (Local RoBERTa NER):</b> 0.3B 파라미터의 <code>kr-dlp-ner-roberta-large</code> 모델이 외부 클라우드 통신 없이 로컬 GPU/CPU에서 구동되어 문맥 속 가해자·피해자 실명, 상세 거주지, 기관명을 100% 완전 마스킹(3,406건 누적 탐지)합니다."
+                    },
+                    {
+                        color: "green",
+                        title: "4) Module 5 & 6: CTGAN 합성 증강 & 재식별 검증 엔진 (Synthesizer & Validator)",
+                        desc: "230건 소규모 표본 문제를 해결하기 위해 내부망 안에서 <b>CTGAN 모델</b>을 학습시켜 1,000건의 합성 112 신고서를 생성합니다. 완전 복제율 0.0% 검증 모듈을 통해 원본 가해자·피해자 정보의 재식별 위험을 수학적으로 원천 차단합니다."
+                    }
+                ],
+                table: [
+                    ["모듈 식별자", "소프트웨어 스택", "핵심 기능 및 보안 사양"],
+                    ["M1. Secure Decryptor", "msoffcrypto-tool / io.BytesIO", "인메모리 스트림 복호화 (디스크 잔여물 0%)"],
+                    ["M2. Structured Masker", "Pandas Rule-based Engine", "좌표, 전화번호 등 38개 필드 일괄 '[비식별화]' 치환"],
+                    ["M3. Regex Engine", "Python re (정규표현식)", "주민·차량·휴대전화 등 고정 패턴 68.2% 선제 마스킹"],
+                    ["M4. RoBERTa Local NER", "kr-dlp-ner-roberta-large", "문맥 기반 인명(PER)·지명(LOC)·기관(ORG) 100% 완전 마스킹"],
+                    ["M5. CTGAN Generator", "SDV CTGAN Framework", "1,000건 생성, 원본 완전복제율 0.0% 증강"],
+                    ["M6. De-id Validator", "String Diff & Leakage Detector", "미마스킹 플레이스홀더 잔존 여부 전수 검증"]
+                ]
+            },
+            2: {
+                title: "하이브리드 비식별화 & 합성 데이터 파이프라인 (Pipeline Flow)",
+                subtitle: "암호화된 112 원본 접수 파일에서부터 최종 비식별화 치안 학습 코퍼스로 정제되기까지의 순차적 단계별 데이터 변환 파이프라인입니다.",
+                specs: [
+                    {
+                        color: "cyan",
+                        title: "Step 1 & 2: 암호 파일 수신 및 정형 메타데이터 일괄 절삭",
+                        desc: "남양주북부서 230건 스토킹 112 신고처리표를 인메모리 복호화한 후, 1차로 38개 메타데이터 컬럼 중 직접 식별 항목을 즉시 제거하고 주소는 구·동 단위까지만 절삭합니다."
+                    },
+                    {
+                        color: "purple",
+                        title: "Step 3 & 4: 2단계 순차 텍스트 비식별화 (Pass 1 Regex ➔ Pass 2 RoBERTa NER)",
+                        desc: "신고내용 및 종결내용 비정형 서술문에 대해 정규식 매칭을 거쳐 2,322건(68.2%)을 치환한 뒤, 문맥 분석 트랜스포머 NER을 순차 통과시켜 1,084건의 비정형 고유명사를 추가 치환, 총 3,406건(100%) 완전 비식별화를 완결합니다."
+                    },
+                    {
+                        color: "green",
+                        title: "Step 5 & 6: CTGAN 합성 증강 및 최종 정제 코퍼스 확정",
+                        desc: "완전 마스킹된 데이터셋의 통계적 분포를 학습한 CTGAN으로 1,000건의 합성 데이터를 증강 생성하고, 원본과의 완전 복제율 0.0%를 확인한 후 최종 가디언즈 모델 학습 코퍼스로 공급합니다."
+                    }
+                ],
+                table: [
+                    ["파이프라인 단계", "입력 데이터", "출력 데이터 및 성과 지표"],
+                    ["Step 1. 인메모리 복호화", "AES 암호화 엑셀 파일", "RAM 상의 비암호 바이너리 스트림 (디스크 쓰기 0회)"],
+                    ["Step 2. 정형 필드 마스킹", "원천 38개 컬럼 테이블", "직접식별자 38개 컬럼 '[비식별화]' 치환 테이블"],
+                    ["Step 3. 1차 Regex 치환", "비정형 서술문 원문", "정형 식별자 68.2% 치환 텍스트 (2,322건)"],
+                    ["Step 4. 2차 RoBERTa 치환", "1차 마스킹 텍스트", "인명·지명·기관 100% 완전 마스킹 텍스트 (3,406건)"],
+                    ["Step 5. CTGAN 합성 증강", "230건 완전 마스킹 데이터", "1,000건 합성 신고 데이터 (완전복제율 0.0%)"],
+                    ["Step 6. 치안 코퍼스 확정", "합성 데이터 + 앵커 데이터", "가디언즈 모델 학습용 안전 데이터셋"]
+                ]
+            },
+            3: {
+                title: "초경량 음절 임베딩 및 위험도 모델 모듈 구조도 (Guardians Model Modules)",
+                subtitle: "현장 경찰관의 보급형 업무 PC 및 태블릿 브라우저 CPU에서 5ms 이내 즉각 추론이 가능하도록 최적화된 가디언즈 AI 핵심 컴포넌트 구조도입니다.",
+                specs: [
+                    {
+                        color: "yellow",
+                        title: "1) Module 1: 브래킷 토큰 스트리퍼 (Bracket Token Stripper)",
+                        desc: "과적합(Overfitting) 원인이 되는 <code>[이름]</code>, <code>[장소]</code> 등 비식별화 플레이스홀더를 정규식 반복 치환으로 공백 제거하여, 모델이 '플레이스홀더 유무'가 아닌 '실제 위협 어휘'만을 학습하도록 보장합니다."
+                    },
+                    {
+                        color: "purple",
+                        title: "2) Module 2: 음절 n-gram TF-IDF 벡터라이저 (Syllable Vectorizer)",
+                        desc: "무거운 외부 형태소 분석기 없이 정규식 토크나이저(<code>[가-힣]|[A-Za-z]+|[0-9]+</code>)를 적용합니다. '칼을/칼로/칼이', '죽인다/죽이겠다' 등 한국어 활용형 어미 변형을 1~3음절 n-gram으로 분해하여 15,000차원 희소 벡터로 변환합니다."
+                    },
+                    {
+                        color: "red",
+                        title: "3) Module 3 & 4: 균형 분류기 & 연속 기댓값 산출기 (Classifier & Expectation Engine)",
+                        desc: "<b>• Module 3 (Logistic Classifier):</b> <code>class_weight='balanced'</code> ($C=4.0$) 가중치를 적용하여 저위험(61%) 대비 소수 고위험(16.9%) 클래스의 민감도를 극대화합니다.<br><b>• Module 4 (Expectation Engine):</b> <code>Score = 0.1·P0 + 0.45·P1 + 0.85·P2</code> 공식을 통해 사후 확률 벡터를 계단식 튐이 없는 0.0~1.0 연속 스코어로 환산합니다."
+                    },
+                    {
+                        color: "green",
+                        title: "4) Module 5: ONNX Runtime Web 엔진 (Browser WASM Runtime)",
+                        desc: "파이썬 서버 없이 브라우저의 WebAssembly(WASM) 환경에서 단독 구동되는 초경량 런타임 엔진입니다. 노후 PC에서도 CPU 점유율 1% 미만, 단일 추론 4.2ms의 저전력 초고속 추론을 제공합니다."
+                    }
+                ],
+                table: [
+                    ["모듈 식별자", "소프트웨어 스택", "설계 특징 및 효과"],
+                    ["M1. Token Stripper", "Python re / Regex Stripper", "과적합 원인인 '[이름]', '[장소]' 플레이스홀더 사전 제거"],
+                    ["M2. Syllable Vectorizer", "TfidfVectorizer (Syllable 1~3)", "15,000 차원, 무설치 음절 n-gram으로 한국어 어근 보존"],
+                    ["M3. Balanced Classifier", "Logistic Regression (C=4.0)", "소수 고위험군(16.9%) 가중치 동적 보정, SOS 단문 민감도 극대화"],
+                    ["M4. Expectation Engine", "Continuous Scoring Formula", "Score = 0.1·P0 + 0.45·P1 + 0.85·P2 (연속 스피도미터 연동)"],
+                    ["M5. ONNX Web Runtime", "ONNX Runtime Web (WASM)", "브라우저 CPU 단독 구동, 단일 추론 4.2ms 저전력 실현"]
+                ]
+            },
+            4: {
+                title: "실시간 112 신고 접수-추론-출동 파이프라인 (Real-time Pipeline Flow)",
+                subtitle: "112 긴급 전화 접수 시점부터 웹 브라우저 AI 위험도 산출, 지령실 Code 0 긴급출동 및 사후 잠정조치 청구로 이어지는 엔드투엔드 치안 현장 파이프라인입니다.",
+                specs: [
+                    {
+                        color: "cyan",
+                        title: "Step 1 & 2: 신고 유입 및 브라우저 인메모리 텐서화",
+                        desc: "112 상황실 접수 요원이 발화 내용을 타이핑하거나 음성 텍스트가 유입되면, 브라우저가 즉각 <code>ort.Tensor('string', [text], [1, 1])</code> 텐서를 생성하여 WASM 런타임으로 전달합니다."
+                    },
+                    {
+                        color: "yellow",
+                        title: "Step 3 & 4: 5ms 초고속 추론 및 연속 위험도 스코어 산출",
+                        desc: "브라우저 WASM CPU 환경에서 4.2ms 만에 음절 벡터화와 사후 확률 $[P_0, P_1, P_2]$을 연산하고, 기댓값 수식으로 위험 점수를 0.0~1.0으로 환산합니다."
+                    },
+                    {
+                        color: "red",
+                        title: "Step 5 & 6: 3단계 등급화 표출 및 Code 0 긴급 출동 지령 연계",
+                        desc: "점수가 0.7 이상일 경우 대시보드 바늘이 빨간 영역으로 즉시 회전하며 <b>고위험 긴급경보(Code 0)</b>를 발령하여 최단 시간 내 순찰차 출동 및 가해자 분리 조치로 직결됩니다."
+                    }
+                ],
+                table: [
+                    ["파이프라인 단계", "주요 처리 내용", "처리 시간 및 연계 시스템"],
+                    ["Step 1. 신고 발화 접수", "112 긴급신고 접수 요원 서술문 입력", "실시간 접수 (112 상황접수대)"],
+                    ["Step 2. 텐서화 및 전달", "ort.Tensor 브라우저 인메모리 생성", "< 0.5ms (브라우저 메모리)"],
+                    ["Step 3. 음절 모델 추론", "Syllable TF-IDF + Logistic 추론", "4.2ms (ONNX Runtime WASM CPU)"],
+                    ["Step 4. 연속 점수 환산", "Score = 0.1P0 + 0.45P1 + 0.85P2 계산", "< 0.1ms (자바스크립트 연산)"],
+                    ["Step 5. 대시보드 표출", "스피도미터 바늘 회전 & 시계열 차트 갱신", "60fps 화면 동기화 (HTML5 Canvas)"],
+                    ["Step 6. 초동 조치 지령", "고위험 Code 0 긴급 출동 및 잠정조치 청구", "골든타임 내 현장 출동 연계"]
+                ]
+            }
+        };
+
+        function buildGraph(diagType) {
+            nodes = [];
+            links = [];
+            particles = [];
+
+            if (diagType === 1) {
+                // 1. 하이브리드 비식별화 모듈 구조도 (Module Architecture)
+                nodes = [
+                    { id: 'm1', rx: 0.16, ry: 0.25, w: 165, h: 68, title: 'M1. 보안 복호화 로더', sub: 'msoffcrypto 인메모리 스트림', color: '#38bdf8' },
+                    { id: 'm2', rx: 0.50, ry: 0.25, w: 175, h: 68, title: 'M2. 정형 속성 마스커', sub: '38개 메타데이터 일괄 치환', color: '#38bdf8' },
+                    { id: 'm3', rx: 0.84, ry: 0.25, w: 170, h: 68, title: 'M3. Regex 고정패턴기', sub: '주민/전화/차량 68.2% 마스킹', color: '#c084fc' },
+                    
+                    { id: 'm4', rx: 0.25, ry: 0.65, w: 185, h: 72, title: 'M4. RoBERTa Local NER', sub: '인명/지명/기관 100% 완전 마스킹', color: '#c084fc' },
+                    { id: 'm5', rx: 0.58, ry: 0.65, w: 180, h: 72, title: 'M5. CTGAN 합성 증강기', sub: '1,000건 생성 (완전복제율 0.0%)', color: '#34d399' },
+                    { id: 'm6', rx: 0.88, ry: 0.65, w: 165, h: 72, title: 'M6. 비식별 검증기', sub: '잔존 식별자 전수 진단 모듈', color: '#34d399' }
+                ];
+
+                links = [
+                    { from: 'm1', to: 'm2', label: '복호화 테이블' },
+                    { from: 'm2', to: 'm3', label: '비정형 서술문' },
+                    { from: 'm3', to: 'm4', label: '1차 마스킹 텍스트' },
+                    { from: 'm4', to: 'm5', label: '완전 비식별화 텍스트' },
+                    { from: 'm5', to: 'm6', label: '합성 데이터 전송' },
+                    { from: 'm6', to: 'm1', label: '품질 환류 피드백' }
+                ];
+            } else if (diagType === 2) {
+                // 2. 하이브리드 비식별화 파이프라인 (Pipeline Flow)
+                nodes = [
+                    { id: 'p1', rx: 0.12, ry: 0.26, w: 145, h: 64, title: 'Step 1: 암호 원본 수신', sub: '남양주북부서 230건 (AES)', color: '#38bdf8' },
+                    { id: 'p2', rx: 0.38, ry: 0.26, w: 155, h: 64, title: 'Step 2: 인메모리 복호화', sub: '디스크 잔여물 0% 달성', color: '#38bdf8' },
+                    { id: 'p3', rx: 0.65, ry: 0.26, w: 160, h: 64, title: 'Step 3: 정형 필드 마스킹', sub: '38개 컬럼 [비식별화]', color: '#38bdf8' },
+                    { id: 'p4', rx: 0.88, ry: 0.26, w: 155, h: 64, title: 'Step 4: 1차 Regex 패스', sub: '2,322건 패턴 치환 (68.2%)', color: '#c084fc' },
+
+                    { id: 'p5', rx: 0.25, ry: 0.72, w: 175, h: 70, title: 'Step 5: 2차 로컬 NER 패스', sub: '누적 3,406건 완전 마스킹 (100%)', color: '#c084fc' },
+                    { id: 'p6', rx: 0.60, ry: 0.72, w: 180, h: 70, title: 'Step 6: CTGAN 합성 증강', sub: '1,000건 생성 (복제율 0.0%)', color: '#34d399' },
+                    { id: 'p7', rx: 0.88, ry: 0.72, w: 155, h: 70, title: 'Step 7: 안전 코퍼스 확정', sub: '재식별 위험 원천 차단', color: '#34d399' }
+                ];
+
+                links = [
+                    { from: 'p1', to: 'p2', label: '암호 바이너리' },
+                    { from: 'p2', to: 'p3', label: '복호화 스트림' },
+                    { from: 'p3', to: 'p4', label: '비정형 컬럼' },
+                    { from: 'p4', to: 'p5', label: '1차 처리문' },
+                    { from: 'p5', to: 'p6', label: '완전 비식별문' },
+                    { from: 'p6', to: 'p7', label: '합성 증강 병합' }
+                ];
+            } else if (diagType === 3) {
+                // 3. 음절 임베딩 및 모델 모듈 구조도 (Module Architecture)
+                nodes = [
+                    { id: 'e1', rx: 0.16, ry: 0.25, w: 170, h: 68, title: 'M1. Token Stripper', sub: '[이름], [장소] 토큰 공백화', color: '#38bdf8' },
+                    { id: 'e2', rx: 0.50, ry: 0.25, w: 175, h: 68, title: 'M2. Syllable Vectorizer', sub: '1~3음절 n-gram TF-IDF', color: '#fbbf24' },
+                    { id: 'e3', rx: 0.84, ry: 0.25, w: 170, h: 68, title: 'M3. Balanced Classifier', sub: 'Multinomial Logistic (C=4.0)', color: '#fbbf24' },
+
+                    { id: 'e4', rx: 0.25, ry: 0.65, w: 185, h: 72, title: 'M4. Expectation Engine', sub: 'Score = 0.1P0 + 0.45P1 + 0.85P2', color: '#f87171' },
+                    { id: 'e5', rx: 0.60, ry: 0.65, w: 180, h: 72, title: 'M5. ONNX Web Runtime', sub: '브라우저 WASM CPU 단독 구동', color: '#f87171' },
+                    { id: 'e6', rx: 0.88, ry: 0.65, w: 165, h: 72, title: 'M6. 대시보드 렌더러', sub: '반원형 바늘 & 누적 차트 표출', color: '#34d399' }
+                ];
+
+                links = [
+                    { from: 'e1', to: 'e2', label: '정제된 텍스트' },
+                    { from: 'e2', to: 'e3', label: '15,000차원 벡터' },
+                    { from: 'e3', to: 'e4', label: '사후 확률 [P0,P1,P2]' },
+                    { from: 'e4', to: 'e5', label: '단일 연속 스코어' },
+                    { from: 'e5', to: 'e6', label: '5ms 초고속 추론' }
+                ];
+            } else {
+                // 4. 실시간 112 신고 접수-추론-출동 파이프라인 (Pipeline Flow)
+                nodes = [
+                    { id: 'r1', rx: 0.12, ry: 0.26, w: 145, h: 64, title: 'Step 1: 112 신고 유입', sub: '실시간 구조요청 발화', color: '#38bdf8' },
+                    { id: 'r2', rx: 0.38, ry: 0.26, w: 155, h: 64, title: 'Step 2: 브라우저 텐서화', sub: 'ort.Tensor([text], [1,1])', color: '#38bdf8' },
+                    { id: 'r3', rx: 0.65, ry: 0.26, w: 160, h: 64, title: 'Step 3: 음절 모델 추론', sub: 'WASM 4.2ms 초고속 연산', color: '#fbbf24' },
+                    { id: 'r4', rx: 0.88, ry: 0.26, w: 155, h: 64, title: 'Step 4: 연속 점수 환산', sub: '기댓값 수식 스코어링', color: '#f87171' },
+
+                    { id: 'r5', rx: 0.25, ry: 0.72, w: 175, h: 70, title: 'Step 5: 실시간 등급화', sub: '저(0.3) / 중(0.7) / 고(1.0)', color: '#f87171' },
+                    { id: 'r6', rx: 0.60, ry: 0.72, w: 180, h: 70, title: 'Step 6: 계기판 바늘 회전', sub: '스피도미터 & 시계열 동기화', color: '#34d399' },
+                    { id: 'r7', rx: 0.88, ry: 0.72, w: 155, h: 70, title: 'Step 7: Code 0 출동 지령', sub: '긴급응급·잠정조치 연계', color: '#34d399' }
+                ];
+
+                links = [
+                    { from: 'r1', to: 'r2', label: '신고 텍스트' },
+                    { from: 'r2', to: 'r3', label: '입력 텐서' },
+                    { from: 'r3', to: 'r4', label: '클래스별 확률' },
+                    { from: 'r4', to: 'r5', label: '0.0~1.0 점수' },
+                    { from: 'r5', to: 'r6', label: '대시보드 반영' },
+                    { from: 'r6', to: 'r7', label: '고위험 경보 발령' }
+                ];
+            }
+
+            // 파티클 생성
+            for (let i = 0; i < 22; i++) {
+                const link = links[Math.floor(Math.random() * links.length)];
+                particles.push({
+                    link: link,
+                    progress: Math.random(),
+                    speed: 0.005 + Math.random() * 0.007
+                });
+            }
+        }
+
+        function drawScene() {
+            const width = canvas.parentElement.clientWidth;
+            const height = canvas.parentElement.clientHeight;
+
+            ctx.clearRect(0, 0, width, height);
+
+            // 반응형 노드 픽셀 좌표 자동 환산 (경계선 안쪽 패딩 적용으로 짤림 방지)
+            nodes.forEach(node => {
+                node.x = width * node.rx - node.w / 2;
+                node.y = height * node.ry - node.h / 2;
+
+                if (node.x < 14) node.x = 14;
+                if (node.x + node.w > width - 14) node.x = width - node.w - 14;
+                if (node.y < 14) node.y = 14;
+                if (node.y + node.h > height - 14) node.y = height - node.h - 14;
+            });
+
+            // 배경 기술적 그리드 렌더링
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.025)";
+            ctx.lineWidth = 1;
+            for (let x = 0; x < width; x += 32) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < height; y += 32) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(width, y);
+                ctx.stroke();
+            }
+
+            // 연결 링크 렌더링
+            links.forEach(link => {
+                const src = nodes.find(n => n.id === link.from);
+                const dst = nodes.find(n => n.id === link.to);
+                if (!src || !dst) return;
+
+                const sx = src.x + src.w / 2;
+                const sy = src.y + src.h / 2;
+                const dx = dst.x + dst.w / 2;
+                const dy = dst.y + dst.h / 2;
+
+                ctx.beginPath();
+                ctx.strokeStyle = "rgba(148, 163, 184, 0.3)";
+                ctx.lineWidth = 2;
+                ctx.moveTo(sx, sy);
+                ctx.lineTo(dx, dy);
+                ctx.stroke();
+
+                if (link.label) {
+                    const mx = (sx + dx) / 2;
+                    const my = (sy + dy) / 2;
+                    ctx.font = "11px Pretendard, sans-serif";
+                    ctx.fillStyle = "rgba(148, 163, 184, 0.8)";
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "bottom";
+                    ctx.fillText(link.label, mx, my - 4);
+                }
+            });
+
+            // 데이터 플로우 입자(Particle) 렌더링
+            particles.forEach(p => {
+                const src = nodes.find(n => n.id === p.link.from);
+                const dst = nodes.find(n => n.id === p.link.to);
+                if (!src || !dst) return;
+
+                const sx = src.x + src.w / 2;
+                const sy = src.y + src.h / 2;
+                const dx = dst.x + dst.w / 2;
+                const dy = dst.y + dst.h / 2;
+
+                const cx = sx + (dx - sx) * p.progress;
+                const cy = sy + (dy - sy) * p.progress;
+
+                ctx.beginPath();
+                ctx.arc(cx, cy, 3.5, 0, Math.PI * 2);
+                ctx.fillStyle = src.color || "#38bdf8";
+                ctx.shadowColor = src.color || "#38bdf8";
+                ctx.shadowBlur = 8;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+
+                p.progress += p.speed;
+                if (p.progress > 1) p.progress = 0;
+            });
+
+            // 모듈 노드 카드 렌더링
+            nodes.forEach(node => {
+                const isHover = (hoveredNode === node);
+
+                ctx.shadowColor = isHover ? node.color : "rgba(0, 0, 0, 0.5)";
+                ctx.shadowBlur = isHover ? 18 : 8;
+
+                ctx.fillStyle = isHover ? "#1e2b45" : "#131f38";
+                ctx.beginPath();
+                ctx.roundRect(node.x, node.y, node.w, node.h, 10);
+                ctx.fill();
+
+                ctx.shadowBlur = 0;
+                ctx.strokeStyle = isHover ? node.color : "rgba(255, 255, 255, 0.12)";
+                ctx.lineWidth = isHover ? 2 : 1;
+                ctx.stroke();
+
+                // 포인트 컬러 라인
+                ctx.fillStyle = node.color;
+                ctx.beginPath();
+                ctx.roundRect(node.x, node.y, 5, node.h, [10, 0, 0, 10]);
+                ctx.fill();
+
+                // 타이틀
+                ctx.fillStyle = isHover ? "#ffffff" : "#f8fafc";
+                ctx.font = "bold 13px Pretendard, sans-serif";
+                ctx.textAlign = "left";
+                ctx.textBaseline = "top";
+                ctx.fillText(node.title, node.x + 14, node.y + 13);
+
+                // 서브텍스트
+                ctx.fillStyle = isHover ? "#cbd5e1" : "#94a3b8";
+                ctx.font = "11px Pretendard, sans-serif";
+                ctx.fillText(node.sub, node.x + 14, node.y + 36);
+            });
+        }
+
+        function runLoop() {
+            drawScene();
+            animId = requestAnimationFrame(runLoop);
+        }
+
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+
+            let hit = null;
+            for (let node of nodes) {
+                if (mx >= node.x && mx <= node.x + node.w &&
+                    my >= node.y && my <= node.y + node.h) {
+                    hit = node;
+                    break;
+                }
+            }
+
+            hoveredNode = hit;
+            if (hit) {
+                canvas.style.cursor = 'pointer';
+                tooltip.style.opacity = '1';
+                tooltip.style.left = `${e.clientX + 14}px`;
+                tooltip.style.top = `${e.clientY + 14}px`;
+                tooltip.innerHTML = `<b>${hit.title}</b><br><span style="color:#94a3b8;">${hit.sub}</span>`;
+            } else {
+                canvas.style.cursor = 'default';
+                tooltip.style.opacity = '0';
+            }
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            hoveredNode = null;
+            tooltip.style.opacity = '0';
+        });
+
+        function switchDiagram(type) {
+            activeDiagram = type;
+
+            document.querySelectorAll('.switch-btn').forEach((btn, idx) => {
+                if (idx + 1 === type) btn.classList.add('active');
+                else btn.classList.remove('active');
+            });
+
+            const titles = {
+                1: "하이브리드 비식별화 서브시스템 모듈 구조도 (De-id Module Architecture)",
+                2: "하이브리드 비식별화 & 합성 데이터 파이프라인 (De-id Pipeline Flow)",
+                3: "음절 임베딩 및 위험도 모델 모듈 구조도 (Guardians Model Modules)",
+                4: "실시간 112 신고 접수-추론-출동 파이프라인 (Real-time Pipeline Flow)"
+            };
+            const icons = { 1: "🔒", 2: "🔄", 3: "⚡", 4: "🚀" };
+            const tags = { 
+                1: "경찰 내부망 폐쇄환경 (모듈)", 
+                2: "단계별 데이터 처리 흐름 (파이프라인)", 
+                3: "초경량·저전력 온디바이스 (모듈)", 
+                4: "현장 초동 조치 연계 (파이프라인)" 
+            };
+
+            document.getElementById('diagTitle').innerText = titles[type];
+            document.getElementById('diagIcon').innerText = icons[type];
+            document.getElementById('diagTag').innerText = tags[type];
+
+            renderInfoPanel(type);
+            buildGraph(type);
+        }
+
+        function renderInfoPanel(type) {
+            const data = diagramDescriptions[type];
+            const container = document.getElementById('panelContent');
+
+            let html = `
+                <h2>${data.title}</h2>
+                <div class="subtitle">${data.subtitle}</div>
+            `;
+
+            data.specs.forEach(s => {
+                html += `
+                    <div class="spec-box ${s.color}">
+                        <div class="spec-title">${s.title}</div>
+                        <div class="spec-desc">${s.desc}</div>
+                    </div>
+                `;
+            });
+
+            html += `
+                <div style="margin-top: 18px;">
+                    <div class="spec-title" style="margin-bottom: 8px;">📋 세부 모듈 및 파이프라인 사양표</div>
+                    <table class="summary-table">
+                        <thead>
+                            <tr>
+                                <th>${data.table[0][0]}</th>
+                                <th>${data.table[0][1]}</th>
+                                <th>${data.table[0][2]}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            for (let i = 1; i < data.table.length; i++) {
+                html += `
+                    <tr>
+                        <td><b>${data.table[i][0]}</b></td>
+                        <td>${data.table[i][1]}</td>
+                        <td>${data.table[i][2]}</td>
+                    </tr>
+                `;
+            }
+
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            container.innerHTML = html;
+        }
+
+        window.onload = () => {
+            switchDiagram(1);
+            resizeCanvas();
+            runLoop();
+        };
+    </script>
+</body>
+</html>
