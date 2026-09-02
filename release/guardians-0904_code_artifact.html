@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>가디언즈(Guardians) 치안 AI 프레임워크 캔버스</title>
+    <style>
+        :root {
+            --bg-main: #0b1329;
+            --bg-card: #152238;
+            --bg-card-hover: #1c2e4c;
+            --border: #2a3b5c;
+            --accent-blue: #38bdf8;
+            --accent-green: #34d399;
+            --accent-yellow: #fbbf24;
+            --accent-red: #f87171;
+            --accent-purple: #c084fc;
+            --text-main: #f8fafc;
+            --text-sub: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Malgun Gothic', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* 헤더 */
+        header {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 28px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-logo {
+            width: 38px;
+            height: 38px;
+            background: linear-gradient(135deg, #0284c7, #38bdf8);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: 800;
+            color: white;
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
+        }
+
+        .brand-title h1 {
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .brand-title p {
+            font-size: 12px;
+            color: var(--text-sub);
+        }
+
+        /* 경찰 내부망 및 저전력 전용 뱃지 */
+        .security-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sec-pill {
+            font-size: 11px;
+            padding: 4px 9px;
+            border-radius: 20px;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .sec-pill.net {
+            background: rgba(56, 189, 248, 0.12);
+            color: var(--accent-blue);
+            border: 1px solid rgba(56, 189, 248, 0.35);
+        }
+
+        .sec-pill.power {
+            background: rgba(52, 211, 153, 0.12);
+            color: var(--accent-green);
+            border: 1px solid rgba(52, 211, 153, 0.35);
+        }
+
+        /* 탭 네비게이션 */
+        nav.page-nav {
+            display: flex;
+            background: #0f172a;
+            padding: 4px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            gap: 4px;
+        }
+
+        .nav-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-sub);
+            padding: 8px 18px;
+            font-size: 13.5px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .nav-btn:hover {
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .nav-btn.active {
+            color: #0369a1;
+            background: var(--accent-blue);
+            box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
+            color: #041226;
+            font-weight: 700;
+        }
+
+        /* 메인 레이아웃 */
+        main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1.15fr 0.85fr;
+            gap: 20px;
+            padding: 24px 28px;
+            max-width: 1700px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        @media (max-width: 1100px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* 캔버스 뷰포트 카드 */
+        .canvas-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-tag {
+            font-size: 11px;
+            padding: 3px 8px;
+            background: rgba(56, 189, 248, 0.15);
+            color: var(--accent-blue);
+            border-radius: 4px;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            font-weight: 600;
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            flex: 1;
+            min-height: 520px;
+            background: #090e1c;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            overflow: hidden;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .canvas-hint {
+            position: absolute;
+            bottom: 12px;
+            right: 14px;
+            font-size: 11px;
+            color: rgba(148, 163, 184, 0.7);
+            pointer-events: none;
+        }
+
+        /* 설명 패널 */
+        .details-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            max-height: calc(100vh - 120px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+        }
+
+        .details-header {
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 16px;
+            margin-bottom: 20px;
+        }
+
+        .details-header h2 {
+            font-size: 22px;
+            font-weight: 800;
+            color: var(--text-main);
+            margin-bottom: 6px;
+        }
+
+        .details-header p {
+            font-size: 13.5px;
+            color: var(--text-sub);
+            line-height: 1.5;
+        }
+
+        .section-block {
+            margin-bottom: 20px;
+            background: rgba(15, 23, 42, 0.5);
+            padding: 16px 18px;
+            border-radius: 10px;
+            border-left: 4px solid var(--accent-blue);
+        }
+
+        .section-block.green { border-left-color: var(--accent-green); }
+        .section-block.yellow { border-left-color: var(--accent-yellow); }
+        .section-block.purple { border-left-color: var(--accent-purple); }
+        .section-block.red { border-left-color: var(--accent-red); }
+
+        .section-title {
+            font-size: 14.5px;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .section-body {
+            font-size: 13px;
+            color: #cbd5e1;
+            line-height: 1.6;
+        }
+
+        .spec-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 12.5px;
+        }
+
+        .spec-table th, .spec-table td {
+            padding: 8px 10px;
+            border: 1px solid var(--border);
+            text-align: left;
+        }
+
+        .spec-table th {
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--accent-blue);
+            font-weight: 600;
+        }
+
+        .spec-table td {
+            color: #e2e8f0;
+        }
+
+        /* 툴팁 */
+        #tooltip {
+            position: absolute;
+            background: rgba(15, 23, 42, 0.95);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s;
+            border: 1px solid var(--accent-blue);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            max-width: 260px;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="brand">
+            <div class="brand-logo">🛡️</div>
+            <div class="brand-title">
+                <h1>GUARDIANS AI 프레임워크 캔버스</h1>
+                <p>경찰 내부망 전용 · 저전력 온디바이스 기반 실시간 스토킹 위험도 예측 체계</p>
+            </div>
+        </div>
+        <div class="security-badge">
+            <span class="sec-pill net">🔒 경찰 내부망(폐쇄망) 100% 완결</span>
+            <span class="sec-pill power">⚡ 초경량·저전력 브라우저 구동</span>
+        </div>
+        <nav class="page-nav">
+            <button class="nav-btn active" onclick="switchPage(1)">
+                <span>🛠️</span> Page 1: 도구 프레임워크
+            </button>
+            <button class="nav-btn" onclick="switchPage(2)">
+                <span>⚙️</span> Page 2: 방법·절차 프레임워크
+            </button>
+            <button class="nav-btn" onclick="switchPage(3)">
+                <span>🌐</span> Page 3: 연결·종합 프레임워크
+            </button>
+        </nav>
+    </header>
+
+    <main>
+        <!-- 캔버스 영역 -->
+        <div class="canvas-card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span id="canvasPageIcon">🛠️</span>
+                    <span id="canvasPageTitle">도구 구조 및 상호 관계 다이어그램</span>
+                </div>
+                <span class="card-tag" id="canvasPageTag">Interactive Canvas 2D</span>
+            </div>
+            <div class="canvas-wrapper">
+                <canvas id="mainCanvas"></canvas>
+                <div class="canvas-hint">💡 각 모듈 노드에 마우스를 올리면 상세 정보를 확인할 수 있습니다.</div>
+                <div id="tooltip"></div>
+            </div>
+        </div>
+
+        <!-- 상세 설명 영역 -->
+        <div class="details-card" id="detailsContainer">
+            <!-- 동적 삽입 내용 -->
+        </div>
+    </main>
+
+    <script>
+        // 전역 상태 관리
+        let currentPage = 1;
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+        const tooltip = document.getElementById('tooltip');
+
+        let nodes = [];
+        let edges = [];
+        let hoveredNode = null;
+        let animationFrameId = null;
+        let flowParticles = [];
+
+        // 고해상도 캔버스 초기화
+        function resizeCanvas() {
+            const wrapper = canvas.parentElement;
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = wrapper.clientWidth * dpr;
+            canvas.height = wrapper.clientHeight * dpr;
+            ctx.scale(dpr, dpr);
+            renderCanvas();
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        // 페이지별 텍스트 데이터베이스
+        const pageDetails = {
+            1: {
+                title: "1. 기술 도구 프레임워크 (Tools Framework)",
+                desc: "남양주북부경찰서 스토킹 112 신고 데이터 보호부터 저전력 웹 런타임 배포까지, 일체의 외부 유출 없이 경찰 내부망(폐쇄망) 안에서 완결되는 기술 스택입니다.",
+                blocks: [
+                    {
+                        color: "blue",
+                        title: "1) 데이터 수집 및 암호화 제어 도구 (내부망 보안)",
+                        body: "남양주북부경찰서 수사과 협조로 확보한 스토킹 112 신고 데이터(230건)를 <code>msoffcrypto</code> 엔진으로 내부망 워크스테이션에서 직접 복호화 및 로드합니다. 일체의 외부 인터넷 연결 없이 폐쇄망 안에서만 데이터가 순환되도록 물리적 보안을 통제합니다."
+                    },
+                    {
+                        color: "purple",
+                        title: "2) 2단계 로컬 하이브리드 비식별화 도구군 (De-identification)",
+                        body: "<b>• 정규표현식(Regex) 엔진:</b> 전화번호, 주민번호, 차량번호 등 고정 패턴 식별자를 1차 마스킹(68.2%).<br><b>• kr-dlp-ner-roberta-large (로컬 전용 NER):</b> 고성능 GPU 서버나 외부 클라우드 통신 없이, 경찰 내부망 로컬 PC 환경에서 직접 구동되어 문맥 속 인명(PER), 지명(LOC), 상호(ORG)를 100% 식별 마스킹합니다."
+                    },
+                    {
+                        color: "green",
+                        title: "3) 폐쇄망 로컬 합성 데이터 엔진 (CTGAN Generator)",
+                        body: "230건의 소규모 표본 문제를 해결하기 위해 내부망 안에서 <b>CTGAN</b> 모델을 학습시켜 1,000건의 모의 112 신고서를 생성합니다. <b>완전 복제율 0.0%</b>를 달성하여 원본 피의자·피해자 정보의 재식별 위험을 원천 차단합니다."
+                    },
+                    {
+                        color: "yellow",
+                        title: "4) 초경량·저전력 임베딩 및 추론 런타임 (Low-Power ONNX Web)",
+                        body: "<b>• 음절 단위 n-gram (1~3) TF-IDF:</b> 무거운 외부 형태소 분석기나 거대 언어모델 없이 브라우저 CPU 연산만으로 '칼/흉기/죽이/살려' 등 한국어 활용형을 완벽 처리하는 초경량 임베딩 기법.<br><b>• ONNX Runtime Web:</b> 별도의 파이썬 백엔드나 고전력 그래픽카드 없이 현장 경찰관의 보급형 태블릿 및 구형 업무 PC 브라우저에서 <b>5ms 이내 즉각 추론(저전력 친화형)</b>이 가능합니다."
+                    }
+                ],
+                table: [
+                    ["모듈", "사용 도구 / 기술", "주요 역할 및 내부망·저전력 특성"],
+                    ["데이터 보호", "msoffcrypto (내부망)", "민감 신고데이터 비밀번호 기반 안전 복호화 (외부 유출 원천 차단)"],
+                    ["1차 비식별", "Python re (정규표현식)", "전화·주민번호·차량번호 등 정형 패턴 68.2% 초고속 마스킹"],
+                    ["2차 비식별", "kr-dlp-ner-roberta-large", "로컬 트랜스포머 기반 비정형 인명·지명·기관 3,406건 완전 마스킹"],
+                    ["합성 증강", "SDV CTGAN Framework", "1,000건 증강, 원본 완전복제율 0%로 내부망 내 안전성 확보"],
+                    ["임베딩/추론", "Syllable TF-IDF + ONNX Web", "CPU 5ms 이내 초경량 추론, 노후 PC 및 현장 태블릿 저전력 구동"]
+                ]
+            },
+            2: {
+                title: "2. 방법 및 절차 프레임워크 (Methods Framework)",
+                desc: "원천 데이터 확보 단계부터 로컬 비식별화, 편향 해소 증강, 음절 임베딩 파이프라인 및 실시간 3단계 위험 점수 산출에 이르는 절차 흐름도입니다.",
+                blocks: [
+                    {
+                        color: "blue",
+                        title: "Step 1. 원본 수집 및 구조화 속성 마스킹",
+                        body: "접수자, 지령자, 좌표, 전화번호 등 38개 필드 중 직접 식별 항목을 즉시 <code>[비식별화]</code>로 치환하고 발생 주소는 구·동 단위까지만 보존합니다."
+                    },
+                    {
+                        color: "purple",
+                        title: "Step 2. 비정형 서술문 텍스트 로컬 하이브리드 비식별화",
+                        body: "경찰관이 서술한 '신고내용' 및 '종결내용'에 대해 정규표현식으로 1차 치환 후, 내부망에 탑재된 RoBERTa NER 모델을 거쳐 문맥 속 가해자·피해자 실명과 장소를 <code>[이름]</code>, <code>[장소]</code>로 완전 마스킹합니다."
+                    },
+                    {
+                        color: "yellow",
+                        title: "Step 3. 데이터 불균형 해소 및 SOS 앵커 증강",
+                        body: "CTGAN 데이터 특유의 반복 중복행(1,555건)을 제거한 후, 단순 갈등인 저위험 일상 데이터 및 흉기·생명위협 표현을 담은 고위험 보강 데이터를 추가합니다. 특히 단문 구조요청('살려주세요!', '도와주세요!')을 집중 주입하여 단문 위험도 과소평가 편향을 차단합니다."
+                    },
+                    {
+                        color: "red",
+                        title: "Step 4. 저전력 음절 임베딩 및 위험도 등급화 산출",
+                        body: "1~3음절 단위 n-gram TF-IDF 벡터화 및 로지스틱 회귀를 거쳐 클래스 확률 $[P_0, P_1, P_2]$을 산출합니다. 최종 점수는 <code>Score = P0×0.1 + P1×0.45 + P2×0.85</code> 기댓값 공식으로 환산되어 <b>저위험(0.0~0.3)</b>, <b>중위험(0.3~0.7)</b>, <b>고위험(0.7~1.0)</b> 등급으로 실시간 분류됩니다."
+                    }
+                ],
+                table: [
+                    ["단계", "작업 내용", "핵심 방법론 및 기준"],
+                    ["1. 데이터 정제", "정형 필드 마스킹 및 중복 제거", "개인정보보호법 준수, 중복 1,555건 필터링"],
+                    ["2. 비식별화", "하이브리드 마스킹 파이프라인", "Regex + 로컬 RoBERTa NER 결합 (내부망 전용)"],
+                    ["3. 데이터 증강", "CTGAN 및 SOS 단문 앵커 보강", "1,000건 합성 + 위협/SOS 키워드 집중 주입"],
+                    ["4. 임베딩", "한글 음절(Syllable) n-gram (1~3)", "ONNX 호환, CPU 단독 저전력 연산 최적화"],
+                    ["5. 위험도 판정", "연속 기댓값 스코어링", "저위험(0.0~0.3) / 중위험(0.3~0.7) / 고위험(0.7~1.0)"]
+                ]
+            },
+            3: {
+                title: "3. 연결 및 종합 프레임워크 (Connection & Systems)",
+                desc: "치안 현장의 112 신고 접수 시점부터 경찰 내부망의 저전력 AI 위험도 분석, 현장 경찰관 출동 지령, 그리고 사후 수사 절차로 이어지는 종합 연계망입니다.",
+                blocks: [
+                    {
+                        color: "blue",
+                        title: "1) 112 접수 및 초동 지령 단계 연계 (First Response)",
+                        body: "신고자가 발화하거나 접수 요원이 타이핑하는 텍스트가 웹 브라우저 기반 가디언즈 대시보드에 실시간 입력됩니다. 0.1초 만에 계기판 바늘과 시계열 위험도 그래프가 갱신되어, 접수자가 위급성을 즉시 판단하고 최단 시간 내 코드 제로(Code 0) 긴급 출동을 지령합니다."
+                    },
+                    {
+                        color: "yellow",
+                        title: "2) 경찰 내부망 보안 경계 및 저전력 엣지 아키텍처",
+                        body: "일체의 외부 인터넷 전송 없이 <b>경찰 내부망(인트라넷) 안에서 100% 완결</b>되는 보안 아키텍처입니다. 브라우저 로컬 메모리(WASM) 환경에서 모델이 작동하므로 대화 유출 위험이 물리적으로 차단되며, <b>저사양 PC에서도 과열 없이 저전력으로 구동</b>됩니다."
+                    },
+                    {
+                        color: "green",
+                        title: "3) 치안 자원 배분 및 사후 수사 절차 피드백 (Police Synergy)",
+                        body: "<b>• 현장 조치:</b> 고위험 판정 시 가해자 격리, 긴급응급조치 1·2호 및 잠정조치 즉시 청구 연계.<br><b>• 자원 최적화:</b> 단순 시비나 저위험 건에 과도한 경찰력이 낭비되는 피로도를 낮추고, 강력범죄 전이 고위험군에 수사력을 집중.<br><b>• 순환 발전:</b> 종결 보고서 피드백을 통해 모델의 판정 정확도를 지속적으로 보정하는 폐쇄형 개선 루프 가동."
+                    }
+                ],
+                table: [
+                    ["연계 체계", "시스템 구성", "치안 정책 및 실무적 기대효과"],
+                    ["112 신고 접수", "실시간 웹 UI 대시보드 연동", "신고 접수 중 위험도 실시간 파악 및 즉각 지령"],
+                    ["현장 초동 조치", "위험도 등급별 프로토콜 가동", "고위험군 긴급응급조치 및 피해자 신속 분리"],
+                    ["치안 자원 관리", "위험도 기반 순찰선/경력 배치", "경찰력 소모 완화 및 스토킹 살인 범죄 예방"],
+                    ["사후 관리 환류", "종결보고서 기반 지속 학습", "가정폭력·교제폭력 등 타 치안 분야로 확장"]
+                ]
+            }
+        };
+
+        // 노드 및 엣지 빌더 (상대 좌표 비율 rx, ry 적용하여 캔버스 크기 변화 시 짤림 방지)
+        function buildGraphForPage(page) {
+            nodes = [];
+            edges = [];
+            flowParticles = [];
+
+            if (page === 1) {
+                // Page 1: Tools Framework (GPT-5.6 삭제, 내부망 로컬 NER 2단계로 직결)
+                nodes = [
+                    { id: 'n1', rx: 0.13, ry: 0.26, w: 145, h: 62, title: '남양주북부서 원본', sub: '230건 스토킹 112처리표', color: '#38bdf8' },
+                    { id: 'n2', rx: 0.13, ry: 0.72, w: 145, h: 62, title: 'msoffcrypto', sub: '내부망 AES 복호화 로더', color: '#38bdf8' },
+                    { id: 'n3', rx: 0.38, ry: 0.26, w: 155, h: 62, title: '1차 Regex Masking', sub: '고정 패턴 68.2% 제거', color: '#c084fc' },
+                    { id: 'n4', rx: 0.38, ry: 0.72, w: 155, h: 68, title: '2차 kr-dlp-roberta', sub: '로컬 NER (인명/지명 100%)', color: '#c084fc' },
+                    { id: 'n6', rx: 0.63, ry: 0.50, w: 155, h: 68, title: 'CTGAN Synthesizer', sub: '1,000건 합성 (복제율0%)', color: '#34d399' },
+                    { id: 'n7', rx: 0.87, ry: 0.26, w: 155, h: 68, title: 'Syllable TF-IDF', sub: '1~3음절 저전력 임베딩', color: '#fbbf24' },
+                    { id: 'n8', rx: 0.87, ry: 0.72, w: 155, h: 68, title: 'ONNX Runtime Web', sub: '내부망 서버리스 실시간 추론', color: '#f87171' }
+                ];
+
+                edges = [
+                    { from: 'n1', to: 'n2', label: '보안 로드' },
+                    { from: 'n2', to: 'n3', label: '1차 정형 패턴' },
+                    { from: 'n3', to: 'n4', label: '2차 문맥 추출' },
+                    { from: 'n4', to: 'n6', label: '완전 비식별화 데이터' },
+                    { from: 'n6', to: 'n7', label: '합성 증강 코퍼스' },
+                    { from: 'n7', to: 'n8', label: '저전력 ONNX 배포' }
+                ];
+            } else if (page === 2) {
+                // Page 2: Methods Framework
+                nodes = [
+                    { id: 'm1', rx: 0.11, ry: 0.50, w: 135, h: 62, title: '1. 원천 텍스트', sub: '신고내용 / 종결내용', color: '#38bdf8' },
+                    { id: 'm2', rx: 0.30, ry: 0.28, w: 140, h: 62, title: '2-A. 정형 마스킹', sub: 'Regex 68.2% 탐지', color: '#c084fc' },
+                    { id: 'm3', rx: 0.30, ry: 0.72, w: 140, h: 62, title: '2-B. 비정형 마스킹', sub: '로컬 RoBERTa NER', color: '#c084fc' },
+                    { id: 'm4', rx: 0.50, ry: 0.50, w: 145, h: 66, title: '3. CTGAN 합성 증강', sub: '1,000건 생성 + SOS보강', color: '#34d399' },
+                    { id: 'm5', rx: 0.70, ry: 0.28, w: 145, h: 66, title: '4. 음절 TF-IDF', sub: '1~3음절 어절 분해', color: '#fbbf24' },
+                    { id: 'm6', rx: 0.70, ry: 0.72, w: 145, h: 66, title: '5. 로지스틱 분류기', sub: 'Balanced 가중치 학습', color: '#fbbf24' },
+                    { id: 'm7', rx: 0.89, ry: 0.50, w: 140, h: 70, title: '6. 위험도 3단계', sub: '저(0.3)/중(0.7)/고(1.0)', color: '#f87171' }
+                ];
+
+                edges = [
+                    { from: 'm1', to: 'm2', label: '정형 필터' },
+                    { from: 'm1', to: 'm3', label: '비정형 서술' },
+                    { from: 'm2', to: 'm4', label: '내부망 병합' },
+                    { from: 'm3', to: 'm4', label: '내부망 병합' },
+                    { from: 'm4', to: 'm5', label: '음절 단위화' },
+                    { from: 'm5', to: 'm6', label: '특질 벡터' },
+                    { from: 'm6', to: 'm7', label: '기댓값 환산' }
+                ];
+            } else if (page === 3) {
+                // Page 3: Connection & Systems
+                nodes = [
+                    { id: 'c1', rx: 0.12, ry: 0.50, w: 145, h: 65, title: '112 신고 접수', sub: '실시간 음성/문자 유입', color: '#38bdf8' },
+                    { id: 'c2', rx: 0.33, ry: 0.26, w: 160, h: 65, title: '경찰 내부망 보안존', sub: '외부망 유출 원천 차단', color: '#38bdf8' },
+                    { id: 'c3', rx: 0.33, ry: 0.74, w: 160, h: 65, title: '가디언즈 코어', sub: '저전력 ONNX 분석 엔진', color: '#fbbf24' },
+                    { id: 'c4', rx: 0.58, ry: 0.50, w: 160, h: 70, title: '실시간 대시보드', sub: '계기판 & 시계열 트렌드', color: '#f87171' },
+                    { id: 'c5', rx: 0.85, ry: 0.26, w: 155, h: 65, title: '지령실 / 현장 출동', sub: 'Code 0~4 등급 지령', color: '#34d399' },
+                    { id: 'c6', rx: 0.85, ry: 0.74, w: 155, h: 65, title: '사후 조치 & 수사', sub: '잠정조치 1·2·3호 청구', color: '#c084fc' },
+                    { id: 'c7', rx: 0.58, ry: 0.88, w: 160, h: 56, title: '환류 및 모델 고도화', sub: '종결 데이터 지속 학습', color: '#94a3b8' }
+                ];
+
+                edges = [
+                    { from: 'c1', to: 'c2', label: '신고 데이터 유입' },
+                    { from: 'c2', to: 'c3', label: '안전 격리 환경' },
+                    { from: 'c3', to: 'c4', label: '위험도 0.0~1.0' },
+                    { from: 'c4', to: 'c5', label: '고위험 긴급 출동' },
+                    { from: 'c5', to: 'c6', label: '가해자 분리/체포' },
+                    { from: 'c6', to: 'c7', label: '결과 피드백' },
+                    { from: 'c7', to: 'c3', label: '모델 성능 업데이트' }
+                ];
+            }
+
+            // 파티클 초기화
+            for (let i = 0; i < 24; i++) {
+                const edge = edges[Math.floor(Math.random() * edges.length)];
+                flowParticles.push({
+                    edge: edge,
+                    progress: Math.random(),
+                    speed: 0.005 + Math.random() * 0.007
+                });
+            }
+        }
+
+        // 캔버스 렌더링 루프 (비율 좌표를 실제 픽셀 좌표로 자동 환산하여 짤림 원천 방지)
+        function renderCanvas() {
+            const width = canvas.parentElement.clientWidth;
+            const height = canvas.parentElement.clientHeight;
+
+            ctx.clearRect(0, 0, width, height);
+
+            // 각 노드의 실제 x, y 위치를 현재 캔버스 크기에 맞춰 계산
+            nodes.forEach(node => {
+                node.x = width * node.rx - node.w / 2;
+                node.y = height * node.ry - node.h / 2;
+
+                // 캔버스 좌우상하 경계선 패딩 보정
+                if (node.x < 15) node.x = 15;
+                if (node.x + node.w > width - 15) node.x = width - node.w - 15;
+                if (node.y < 15) node.y = 15;
+                if (node.y + node.h > height - 15) node.y = height - node.h - 15;
+            });
+
+            // 격자 배경 렌더링
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.03)";
+            ctx.lineWidth = 1;
+            for (let x = 0; x < width; x += 30) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < height; y += 30) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(width, y);
+                ctx.stroke();
+            }
+
+            // 엣지(연결선) 렌더링
+            edges.forEach(edge => {
+                const fromNode = nodes.find(n => n.id === edge.from);
+                const toNode = nodes.find(n => n.id === edge.to);
+                if (!fromNode || !toNode) return;
+
+                const startX = fromNode.x + fromNode.w / 2;
+                const startY = fromNode.y + fromNode.h / 2;
+                const endX = toNode.x + toNode.w / 2;
+                const endY = toNode.y + toNode.h / 2;
+
+                // 곡선 연결
+                ctx.beginPath();
+                ctx.strokeStyle = "rgba(148, 163, 184, 0.25)";
+                ctx.lineWidth = 2;
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(endX, endY);
+                ctx.stroke();
+
+                // 엣지 텍스트
+                if (edge.label) {
+                    const midX = (startX + endX) / 2;
+                    const midY = (startY + endY) / 2;
+                    ctx.font = "11px Pretendard, sans-serif";
+                    ctx.fillStyle = "rgba(148, 163, 184, 0.75)";
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "bottom";
+                    ctx.fillText(edge.label, midX, midY - 4);
+                }
+            });
+
+            // 데이터 플로우 파티클 애니메이션
+            flowParticles.forEach(p => {
+                const fromNode = nodes.find(n => n.id === p.edge.from);
+                const toNode = nodes.find(n => n.id === p.edge.to);
+                if (!fromNode || !toNode) return;
+
+                const startX = fromNode.x + fromNode.w / 2;
+                const startY = fromNode.y + fromNode.h / 2;
+                const endX = toNode.x + toNode.w / 2;
+                const endY = toNode.y + toNode.h / 2;
+
+                const curX = startX + (endX - startX) * p.progress;
+                const curY = startY + (endY - startY) * p.progress;
+
+                ctx.beginPath();
+                ctx.arc(curX, curY, 3.5, 0, Math.PI * 2);
+                ctx.fillStyle = fromNode.color || "#38bdf8";
+                ctx.shadowColor = fromNode.color || "#38bdf8";
+                ctx.shadowBlur = 8;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+
+                p.progress += p.speed;
+                if (p.progress > 1) p.progress = 0;
+            });
+
+            // 노드(모듈 카드) 렌더링
+            nodes.forEach(node => {
+                const isHovered = (hoveredNode === node);
+
+                // 카드 그림자
+                ctx.shadowColor = isHovered ? node.color : "rgba(0, 0, 0, 0.4)";
+                ctx.shadowBlur = isHovered ? 18 : 8;
+
+                // 카드 배경
+                ctx.fillStyle = isHovered ? "#1e293b" : "#131d33";
+                ctx.beginPath();
+                ctx.roundRect(node.x, node.y, node.w, node.h, 10);
+                ctx.fill();
+
+                // 카드 테두리
+                ctx.shadowBlur = 0;
+                ctx.strokeStyle = isHovered ? node.color : "rgba(255, 255, 255, 0.12)";
+                ctx.lineWidth = isHovered ? 2 : 1;
+                ctx.stroke();
+
+                // 좌측 포인트 컬러 바
+                ctx.fillStyle = node.color;
+                ctx.beginPath();
+                ctx.roundRect(node.x, node.y, 5, node.h, [10, 0, 0, 10]);
+                ctx.fill();
+
+                // 타이틀 텍스트
+                ctx.fillStyle = isHovered ? "#ffffff" : "#f1f5f9";
+                ctx.font = "bold 13px Pretendard, sans-serif";
+                ctx.textAlign = "left";
+                ctx.textBaseline = "top";
+                ctx.fillText(node.title, node.x + 14, node.y + 12);
+
+                // 서브 텍스트
+                ctx.fillStyle = isHovered ? "#cbd5e1" : "#94a3b8";
+                ctx.font = "11px Pretendard, sans-serif";
+                ctx.fillText(node.sub, node.x + 14, node.y + 34);
+            });
+        }
+
+        // 애니메이션 루프
+        function animate() {
+            renderCanvas();
+            animationFrameId = requestAnimationFrame(animate);
+        }
+
+        // 마우스 상호작용
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            let found = null;
+            for (let node of nodes) {
+                if (mouseX >= node.x && mouseX <= node.x + node.w &&
+                    mouseY >= node.y && mouseY <= node.y + node.h) {
+                    found = node;
+                    break;
+                }
+            }
+
+            hoveredNode = found;
+            if (found) {
+                canvas.style.cursor = 'pointer';
+                tooltip.style.opacity = '1';
+                tooltip.style.left = `${e.clientX + 14}px`;
+                tooltip.style.top = `${e.clientY + 14}px`;
+                tooltip.innerHTML = `<b>${found.title}</b><br><span style="color:#94a3b8;">${found.sub}</span>`;
+            } else {
+                canvas.style.cursor = 'default';
+                tooltip.style.opacity = '0';
+            }
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            hoveredNode = null;
+            tooltip.style.opacity = '0';
+        });
+
+        // 페이지 전환 로직
+        function switchPage(pageNum) {
+            currentPage = pageNum;
+
+            // 네비게이션 버튼 갱신
+            document.querySelectorAll('.nav-btn').forEach((btn, idx) => {
+                if (idx + 1 === pageNum) btn.classList.add('active');
+                else btn.classList.remove('active');
+            });
+
+            // 캔버스 헤더 갱신
+            const icons = { 1: "🛠️", 2: "⚙️", 3: "🌐" };
+            const titles = {
+                1: "도구 구조 및 상호 관계 다이어그램 (Tools Architecture)",
+                2: "단계별 데이터 처리 절차 다이어그램 (Methods Flow)",
+                3: "치안 시스템 통합 연결 다이어그램 (Systems Ecosystem)"
+            };
+            document.getElementById('canvasPageIcon').innerText = icons[pageNum];
+            document.getElementById('canvasPageTitle').innerText = titles[pageNum];
+
+            // 우측 상세 설명 패널 갱신
+            renderDetails(pageNum);
+
+            // 캔버스 그래프 재구성
+            buildGraphForPage(pageNum);
+        }
+
+        // 상세 설명 HTML 렌더링
+        function renderDetails(pageNum) {
+            const data = pageDetails[pageNum];
+            const container = document.getElementById('detailsContainer');
+
+            let html = `
+                <div class="details-header">
+                    <h2>${data.title}</h2>
+                    <p>${data.desc}</p>
+                </div>
+            `;
+
+            data.blocks.forEach(b => {
+                html += `
+                    <div class="section-block ${b.color}">
+                        <div class="section-title">${b.title}</div>
+                        <div class="section-body">${b.body}</div>
+                    </div>
+                `;
+            });
+
+            html += `
+                <div style="margin-top: 15px;">
+                    <div class="section-title" style="margin-bottom: 8px;">📋 프레임워크 핵심 요약표</div>
+                    <table class="spec-table">
+                        <thead>
+                            <tr>
+                                <th>${data.table[0][0]}</th>
+                                <th>${data.table[0][1]}</th>
+                                <th>${data.table[0][2]}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            for (let i = 1; i < data.table.length; i++) {
+                html += `
+                    <tr>
+                        <td><b>${data.table[i][0]}</b></td>
+                        <td>${data.table[i][1]}</td>
+                        <td>${data.table[i][2]}</td>
+                    </tr>
+                `;
+            }
+
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            container.innerHTML = html;
+        }
+
+        // 초기 구동
+        window.onload = () => {
+            switchPage(1);
+            resizeCanvas();
+            animate();
+        };
+    </script>
+</body>
+</html>
